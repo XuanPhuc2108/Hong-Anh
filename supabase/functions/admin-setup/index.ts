@@ -46,18 +46,33 @@ Deno.serve(async (req: Request) => {
     const action = body?.action ?? 'bootstrap';
 
     if (action === 'bootstrap') {
-      // Chỉ cho phép khi chưa có admin nào.
-      const { count, error: countErr } = await adminClient
-        .from('admin_profiles')
-        .select('*', { count: 'exact', head: true });
-      if (countErr) throw countErr;
-      if ((count ?? 0) > 0) {
+      const { data: claimed, error: claimErr } = await adminClient.rpc(
+        'claim_first_admin',
+        {
+          p_user_id: callerId,
+          p_display_name: body?.display_name ?? 'Quản trị viên',
+        }
+      );
+      if (claimErr) {
+        throw new Error(`Không thể xác nhận quyền thiết lập admin đầu tiên: ${claimErr.message}`);
+      }
+      if (claimed === false) {
         return json(
           { error: 'Đã có quản trị viên. Vui lòng nhờ admin hiện tại thêm bạn.' },
           403
         );
       }
-      await setAdmin(adminClient, callerId, body?.display_name ?? 'Quản trị viên');
+      if (claimed !== true) {
+        throw new Error('RPC claim_first_admin trả về kết quả không hợp lệ.');
+      }
+      try {
+        await setAdmin(adminClient, callerId, body?.display_name ?? 'Quản trị viên');
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : 'Lỗi không xác định';
+        throw new Error(
+          `Đã giữ claim bootstrap nhưng không thể hoàn tất cấu hình admin: ${detail}. Claim không tự hủy; cần kiểm tra thủ công trước khi thử lại.`
+        );
+      }
       return json({ ok: true, message: 'Đã thiết lập quản trị viên đầu tiên.' });
     }
 
@@ -74,9 +89,12 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'status') {
-      const { count } = await adminClient
+      const { count, error: statusErr } = await adminClient
         .from('admin_profiles')
         .select('*', { count: 'exact', head: true });
+      if (statusErr) {
+        throw new Error(`Không thể kiểm tra trạng thái quản trị viên: ${statusErr.message}`);
+      }
       const callerAdmin = await isAdmin(adminClient, callerId);
       return json({ hasAdmin: (count ?? 0) > 0, youAreAdmin: callerAdmin });
     }
@@ -93,8 +111,15 @@ async function setAdmin(
   displayName: string
 ) {
   // Set app_meta_data.is_admin = true (server-side, user không thể tự sửa).
+  const { data: userData, error: userErr } = await client.auth.admin.getUserById(userId);
+  if (userErr) {
+    throw new Error(`Không thể đọc thông tin người dùng để cập nhật quyền admin: ${userErr.message}`);
+  }
+  if (!userData.user) {
+    throw new Error('Không tìm thấy người dùng để cập nhật quyền admin.');
+  }
   const { error: metaErr } = await client.auth.admin.updateUserById(userId, {
-    app_metadata: { is_admin: true },
+    app_metadata: { ...userData.user.app_metadata, is_admin: true },
   });
   if (metaErr) throw metaErr;
   // Thêm vào danh bạ admin_profiles.
