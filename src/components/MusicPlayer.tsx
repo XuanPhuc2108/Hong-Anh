@@ -1,97 +1,43 @@
-import { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Volume2, VolumeX, Music } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Keyboard, Volume2, VolumeX } from 'lucide-react';
+import { readSoundPreferences, saveSoundPreferences } from '@/lib/audio';
 
-/**
- * Nhạc nền — không tự phát, người dùng bấm Play mới bật.
- * Nút điều khiển sống trong menu mở rộng (FloatingNav), không còn
- * thanh riêng cố định dưới màn hình.
- */
+type Preferences = ReturnType<typeof readSoundPreferences>;
+
+/** Sound is opt-in by interaction; there is intentionally no background music. */
 export function MusicControls() {
-  const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [ready, setReady] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [preferences, setPreferences] = useState<Preferences>({ enabled: true, keyboardEnabled: true, volume: 0.35 });
 
-  useEffect(() => {
-    const audio = new Audio(
-      'https://cdn.pixabay.com/audio/2022/10/30/audio_347111d654.mp3'
-    );
-    audio.loop = true;
-    audio.volume = 0.0;
-    audio.preload = 'none';
-    audio.addEventListener('canplay', () => setReady(true));
-    audio.addEventListener('error', () => setReady(false));
-    audioRef.current = audio;
-    return () => {
-      audio.pause();
-      audioRef.current = null;
-    };
-  }, []);
+  useEffect(() => setPreferences(readSoundPreferences()), []);
 
-  const togglePlay = async () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    try {
-      if (playing) {
-        audio.pause();
-        setPlaying(false);
-      } else {
-        await audio.play();
-        setPlaying(true);
-        if (!muted) fadeTo(audio, 0.4);
-      }
-    } catch {
-      setPlaying(false);
-    }
-  };
-
-  const toggleMute = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const next = !muted;
-    setMuted(next);
-    fadeTo(audio, next ? 0 : 0.4);
+  const update = (change: Partial<Preferences>) => {
+    setPreferences((current) => {
+      const next = { ...current, ...change };
+      saveSoundPreferences(next);
+      return next;
+    });
   };
 
   return (
-    <div className="glass flex items-center gap-2 rounded-full p-1.5 pl-3 shadow-glass">
-      <div className="flex items-center gap-2 pr-1">
-        <Music
-          size={15}
-          className={`transition-colors ${playing && !muted ? 'text-fuchsia-600' : 'text-ink-soft'}`}
-        />
-        <span className="text-xs font-medium text-ink-soft">
-          {playing ? (muted ? 'Đang tắt tiếng' : 'Đang phát') : 'Nhạc nền'}
-        </span>
+    <div className="grid gap-3 rounded-2xl bg-white/50 p-4 shadow-[inset_0_1px_0_white]">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2 text-sm font-medium text-ink"><Volume2 size={16} aria-hidden />Âm thanh</span>
+        <button type="button" onClick={() => update({ enabled: !preferences.enabled })} className="btn-tactile rounded-full px-3 py-2 text-xs font-medium text-fuchsia-700" aria-pressed={preferences.enabled}>
+          {preferences.enabled ? 'Đang bật' : 'Đang tắt'}
+        </button>
       </div>
-
-      <button
-        onClick={togglePlay}
-        className="btn-tactile grid h-9 w-9 place-items-center rounded-full gradient-fuchsia text-white shadow-soft"
-        aria-label={playing ? 'Tạm dừng nhạc' : 'Phát nhạc'}
-        disabled={!ready && playing === false}
-      >
-        {playing ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
-      </button>
-
-      <button
-        onClick={toggleMute}
-        className="btn-tactile grid h-9 w-9 place-items-center rounded-full text-fuchsia-700 hover:bg-fuchsia-50"
-        aria-label={muted ? 'Bật tiếng' : 'Tắt tiếng'}
-      >
-        {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-      </button>
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2 text-xs text-ink-soft"><Keyboard size={15} aria-hidden />Tiếng gõ phím</span>
+        <button type="button" onClick={() => update({ keyboardEnabled: !preferences.keyboardEnabled })} className="btn-tactile rounded-full px-3 py-2 text-xs font-medium text-fuchsia-700" aria-pressed={preferences.keyboardEnabled}>
+          {preferences.keyboardEnabled ? 'Bật' : 'Tắt'}
+        </button>
+      </div>
+      <label className="flex items-center gap-3 text-xs text-ink-soft">
+        {preferences.enabled ? <Volume2 size={15} aria-hidden /> : <VolumeX size={15} aria-hidden />}
+        <span className="sr-only">Âm lượng hiệu ứng</span>
+        <input type="range" min="0" max="1" step="0.05" value={preferences.volume} onChange={(event) => update({ volume: Number(event.target.value) })} className="w-full accent-fuchsia-700" aria-label="Âm lượng hiệu ứng" />
+        <span className="w-9 text-right tabular-nums">{Math.round(preferences.volume * 100)}%</span>
+      </label>
     </div>
   );
-}
-
-function fadeTo(audio: HTMLAudioElement, target: number, duration = 400) {
-  const start = audio.volume;
-  const startTime = performance.now();
-  const step = (now: number) => {
-    const t = Math.min(1, (now - startTime) / duration);
-    audio.volume = start + (target - start) * t;
-    if (t < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
 }

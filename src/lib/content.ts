@@ -4,6 +4,13 @@
  * hoặc thay đổi trực tiếp tại đây. Không có chi tiết cá nhân nào bị bịa ra.
  */
 
+export type PhotoSpaceId = 'together' | 'phuc' | 'anh';
+
+export const relationshipDates = {
+  firstConversation: '2026-10-26',
+  officialStart: '2026-11-01',
+} as const;
+
 export type StoryItem = {
   id: string;
   date: string;
@@ -30,6 +37,21 @@ export type GalleryImage = {
   src: string;
   caption: string;
   span: 'tall' | 'wide' | 'square' | 'big';
+  collection?: PhotoSpaceId;
+};
+
+export type Song = {
+  id: string;
+  title: string;
+  artist: string;
+  artwork?: string;
+  note?: string;
+  url?: string;
+};
+
+export const playlists: { anh: Song[]; phuc: Song[] } = {
+  anh: [],
+  phuc: [],
 };
 
 export const siteContent = {
@@ -48,25 +70,16 @@ export const siteContent = {
       'Những mốc thời gian đáng nhớ — ghi lại theo thứ tự, để sau này nhớ lại không bị sót điều gì.',
     items: [
       {
-        id: 's1',
-        date: 'Chưa có ngày',
-        title: 'Lần đầu tiên gặp nhau',
-        description:
-          'Thêm ngày và vài dòng mô tả cho khoảnh khắc này — viết theo giọng của bạn, không cần văn vẻ.',
+        id: 'first-conversation',
+        date: '26 tháng 10, 2026',
+        title: 'Bắt đầu trò chuyện',
+        description: 'Ngày Ánh bắt đầu trò chuyện với Phúc.',
       },
       {
-        id: 's2',
-        date: 'Chưa có ngày',
-        title: 'Một buổi chiều đáng nhớ',
-        description:
-          'Mô tả ngắn về một ngày mà bạn muốn nhớ mãi. Có thể là một chi tiết nhỏ nhưng ý nghĩa.',
-      },
-      {
-        id: 's3',
-        date: 'Chưa có ngày',
-        title: 'Khoảnh khắc trọn vẹn',
-        description:
-          'Một cột mốc khác trong dòng thời gian — thêm bao nhiêu tuỳ bạn.',
+        id: 'official-start',
+        date: '1 tháng 11, 2026',
+        title: 'Chính thức bên nhau',
+        description: 'Ngày Phúc và Ánh chính thức trở thành một đôi.',
       },
     ] as StoryItem[],
   },

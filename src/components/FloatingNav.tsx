@@ -1,44 +1,51 @@
-import { useEffect, useState } from 'react';
-import { Menu, X, BookHeart } from 'lucide-react';
-import { useActiveSection } from '@/lib/hooks';
+import { useEffect, useRef, useState } from 'react';
+import { useActiveSection, useGlassPointer } from '@/lib/hooks';
 import { MusicControls } from '@/components/MusicPlayer';
+import { BrandMark } from '@/components/BrandMark';
+import { playMenuSound } from '@/lib/audio';
 
 const SECTIONS = [
-  { id: 'hero', label: 'Trang đầu' },
-  { id: 'story', label: 'Câu chuyện' },
-  { id: 'gallery', label: 'Khoảnh khắc' },
-  { id: 'things', label: 'Điều nhỏ bé' },
-  { id: 'diary', label: 'Nhật ký' },
-  { id: 'letter', label: 'Bức thư' },
-  { id: 'next', label: 'Chương sau' },
+  { id: 'hero', label: 'Trang chủ', note: 'Bìa cuốn sổ' },
+  { id: 'journey', label: 'Hành trình', note: 'Hai cột mốc của tụi mình' },
+  { id: 'library', label: 'Không gian ảnh', note: 'Ba album riêng' },
+  { id: 'soundtrack', label: 'Playlist', note: 'Our Soundtrack' },
+  { id: 'corner', label: 'Góc riêng', note: 'Điều nhỏ và bức thư' },
 ];
 
+const SECTION_IDS = SECTIONS.map((s) => s.id);
+
+/**
+ * One liquid-glass capsule that morphs open into a panel. Desktop shows the
+ * four chapters inline; the panel adds chapter notes and audio. On mobile
+ * the panel is the whole menu. Music stays mounted so playback survives
+ * opening and closing the panel.
+ */
 export function FloatingNav() {
-  const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const active = useActiveSection(SECTIONS.map((s) => s.id));
+  const active = useActiveSection(SECTION_IDS);
+  const glassRef = useGlassPointer<HTMLDivElement>();
+  const panelRef = useRef<HTMLDivElement>(null);
 
+  // Collapsed panel content must not be reachable by keyboard / screen readers.
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+    panelRef.current?.toggleAttribute('inert', !open);
+  }, [open]);
 
-  // Lock page scroll only while the sheet is open (body, not the sheet,
-  // so iOS rubber-banding inside the sheet stays natural).
   useEffect(() => {
     if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    window.addEventListener('keydown', onKey);
+    const mobile = window.matchMedia('(max-width: 767px)').matches;
     const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (mobile) document.body.style.overflow = 'hidden';
     return () => {
+      window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
   }, [open]);
 
   const go = (id: string) => {
     setOpen(false);
-    // Wait for the body unlock before scrolling, otherwise smooth scroll is clamped.
     window.setTimeout(() => {
       document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 20);
@@ -46,97 +53,112 @@ export function FloatingNav() {
 
   return (
     <>
-      <div
-        className={`fixed top-0 left-0 right-0 z-40 safe-pt px-4 transition-all duration-500 ${
-          scrolled ? 'py-2' : 'py-4'
-        }`}
-      >
-        <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-          <button
-            onClick={() => go('hero')}
-            className="glass glass-specular glass-refraction btn-tactile flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-fuchsia-700"
-            aria-label="Về trang đầu"
-          >
-            <BookHeart size={16} className="text-fuchsia-600" />
-            <span className="hidden sm:inline">Nhật ký cho Ánh</span>
-          </button>
-
-          {/* Desktop section pills */}
-          <div className="glass glass-specular hidden items-center gap-1 rounded-full p-1.5 md:flex">
-            {SECTIONS.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => go(s.id)}
-                className={`btn-tactile rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                  active === s.id
-                    ? 'gradient-fuchsia text-white shadow-soft'
-                    : 'text-ink-soft hover:text-fuchsia-700'
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Mobile menu button */}
-          <button
-            onClick={() => setOpen((v) => !v)}
-            className="glass glass-specular btn-tactile grid h-10 w-10 place-items-center rounded-full text-fuchsia-700 md:hidden"
-            aria-label={open ? 'Đóng menu' : 'Mở menu'}
-            aria-expanded={open}
-          >
-            {open ? <X size={18} /> : <Menu size={18} />}
-          </button>
-        </nav>
-      </div>
-
-      {/* Mobile sheet — dims the light field behind, items cascade in */}
       {open && (
         <div
-          className="fixed inset-0 z-30 overflow-y-auto overscroll-contain md:hidden"
-          role="dialog"
-          aria-modal="true"
+          aria-hidden
+          className="fixed inset-0 z-30 animate-fade-in bg-paper-warm/40 md:bg-transparent"
+          onClick={() => setOpen(false)}
+        />
+      )}
+      <div className="safe-pt fixed inset-x-0 top-0 z-40 px-3 pt-3 sm:px-5">
+        <div
+          ref={glassRef}
+          className="lg mx-auto w-full max-w-[44rem] rounded-[1.75rem] transition-[border-radius] duration-500"
         >
-          <div
-            className="fixed inset-0 bg-paper-warm/50 backdrop-blur-md animate-fade-in"
-            onClick={() => setOpen(false)}
-          />
-          <div className="relative px-4 pt-24 pb-10 safe-top">
-            <div
-              className="glass glass-specular glass-refraction sheet-in rounded-3xl p-3 shadow-glass-lg"
-              onClick={(e) => e.stopPropagation()}
+          <nav aria-label="Điều hướng chính" className="flex items-center justify-between gap-2 py-1.5 pl-4 pr-1.5">
+            <button
+              onClick={() => go('hero')}
+              className="btn-tactile flex min-w-0 items-center gap-2 py-1.5 text-left"
+              aria-label="Về trang chủ My Love"
             >
-              <ul className="flex flex-col">
-                {SECTIONS.map((s, i) => (
+              <BrandMark size={34} />
+              <span className="font-serif text-lg italic text-ink">My Love</span>
+            </button>
+
+            <ul className="hidden items-center gap-0.5 md:flex">
+              {SECTIONS.map((s) => {
+                const isActive = active === s.id;
+                return (
                   <li key={s.id}>
                     <button
                       onClick={() => go(s.id)}
-                      className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-medium transition-colors ${
-                        active === s.id
-                          ? 'bg-fuchsia-50 text-fuchsia-700'
-                          : 'text-ink-soft hover:bg-fuchsia-50/60'
+                      aria-current={isActive ? 'true' : undefined}
+                      className={`btn-tactile relative rounded-full px-3.5 py-2 text-[0.8rem] font-medium ${
+                        isActive ? 'bg-white/70 text-fuchsia-700 shadow-[inset_0_1px_0_white,0_4px_12px_-6px_rgba(120,40,70,0.35)]' : 'text-ink-soft hover:text-ink'
                       }`}
                     >
-                      <span>{s.label}</span>
-                      <span className="text-xs text-fuchsia-300">{String(i + 1).padStart(2, '0')}</span>
+                      {s.label}
                     </button>
                   </li>
-                ))}
-              </ul>
+                );
+              })}
+            </ul>
 
-              <div className="my-2 h-px bg-fuchsia-200/60" />
+            <button
+              onClick={() => {
+                playMenuSound();
+                setOpen((value) => !value);
+              }}
+              aria-expanded={open}
+              aria-controls="nav-panel"
+              aria-label={open ? 'Đóng bảng điều hướng' : 'Mở bảng điều hướng'}
+              className="btn-tactile flex h-10 items-center gap-2 rounded-full bg-ink px-4 text-[0.78rem] font-medium text-paper-ivory"
+            >
+              <span className="md:hidden">{open ? 'Đóng' : 'Mục lục'}</span>
+              <span className="hidden md:inline">{open ? 'Đóng' : 'Thêm'}</span>
+              <span aria-hidden className="relative block h-2.5 w-3">
+                <span
+                  className={`absolute left-0 right-0 top-0 h-px bg-current transition-transform duration-500 ${
+                    open ? 'translate-y-[5px] rotate-45' : ''
+                  }`}
+                />
+                <span
+                  className={`absolute bottom-0 left-0 right-0 h-px bg-current transition-transform duration-500 ${
+                    open ? '-translate-y-[4px] -rotate-45' : ''
+                  }`}
+                />
+              </span>
+            </button>
+          </nav>
 
-              {/* Music + sound controls folded into the sheet */}
-              <div className="px-2 pb-1 pt-2">
-                <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-ink-soft">
-                  Nhạc và âm thanh
-                </p>
-                <MusicControls />
+          <div id="nav-panel" ref={panelRef} className="nav-expand" data-open={open}>
+            <div>
+              <div className="mx-4 rule" />
+              <div className="grid gap-6 px-4 pb-4 pt-4 md:grid-cols-[1.3fr_1fr] md:gap-8">
+                <ol className="flex flex-col">
+                  {SECTIONS.map((s, i) => (
+                    <li key={s.id} className="nav-item">
+                      <button
+                        onClick={() => go(s.id)}
+                        className="group flex w-full items-baseline gap-4 rounded-xl py-2.5 text-left"
+                      >
+                        <span className="meta w-6 tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+                        <span className="flex flex-1 flex-col">
+                          <span
+                            className={`font-serif text-2xl transition-colors ${
+                              active === s.id ? 'italic text-fuchsia-700' : 'text-ink group-hover:text-fuchsia-700'
+                            }`}
+                          >
+                            {s.label}
+                          </span>
+                          <span className="text-xs text-ink-soft">{s.note}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+                <div className="nav-item flex flex-col justify-end gap-3">
+                  <p className="eyebrow">Âm thanh</p>
+                  <MusicControls />
+                  <p className="text-xs leading-relaxed text-ink-soft">
+                    Hiệu ứng chỉ phát khi mình tương tác; không có nhạc tự phát.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </>
   );
 }

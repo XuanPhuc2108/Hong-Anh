@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { playMechanicalKey } from '@/lib/audio';
 
 /**
  * Reveal element on scroll into view.
@@ -115,6 +116,96 @@ export function useParallax<T extends HTMLElement = HTMLDivElement>(strength = 0
 }
 
 /**
+ * Moves a glass surface's specular lobe toward the pointer (fine pointers
+ * only). Writes two CSS vars on pointermove, rAF-throttled; no layout work.
+ */
+export function useGlassPointer<T extends HTMLElement = HTMLDivElement>() {
+  const ref = useRef<T | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    let raf = 0;
+    let x = 0;
+    let y = 0;
+    const apply = () => {
+      raf = 0;
+      const r = el.getBoundingClientRect();
+      const gx = Math.max(0, Math.min(100, ((x - r.left) / r.width) * 100));
+      const gy = Math.max(-20, Math.min(60, ((y - r.top) / r.height) * 100 - 30));
+      el.style.setProperty('--gx', `${gx.toFixed(1)}%`);
+      el.style.setProperty('--gy', `${gy.toFixed(1)}%`);
+    };
+    const onMove = (e: PointerEvent) => {
+      x = e.clientX;
+      y = e.clientY;
+      if (!raf) raf = requestAnimationFrame(apply);
+    };
+    const onLeave = () => {
+      el.style.removeProperty('--gx');
+      el.style.removeProperty('--gy');
+    };
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerleave', onLeave);
+    return () => {
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerleave', onLeave);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  return ref;
+}
+
+/**
+ * Fills a vertical line (scaleY 0..1) as its container passes through the
+ * viewport — used for the timeline spine.
+ */
+export function useScrollFill<C extends HTMLElement, F extends HTMLElement>() {
+  const containerRef = useRef<C | null>(null);
+  const fillRef = useRef<F | null>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const fill = fillRef.current;
+    if (!container || !fill) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      fill.style.transform = 'scaleY(1)';
+      return;
+    }
+    let raf = 0;
+    let last = -1;
+    const update = () => {
+      raf = 0;
+      const r = container.getBoundingClientRect();
+      const vh = window.innerHeight;
+      const p = Math.max(0, Math.min(1, (vh * 0.6 - r.top) / r.height));
+      const rounded = Math.round(p * 200) / 200;
+      if (rounded !== last) {
+        last = rounded;
+        fill.style.transform = `scaleY(${rounded})`;
+      }
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  return { containerRef, fillRef };
+}
+
+/**
  * Typewriter for one hero line. Starts after `startDelay` ms, respects
  * prefers-reduced-motion (shows the full text instantly).
  */
@@ -131,6 +222,7 @@ export function useTypewriter(text: string, startDelay = 900, speed = 55) {
     const timeout = window.setTimeout(() => {
       interval = window.setInterval(() => {
         i += 1;
+        playMechanicalKey();
         setOutput(text.slice(0, i));
         if (i >= text.length && interval) window.clearInterval(interval);
       }, speed);
