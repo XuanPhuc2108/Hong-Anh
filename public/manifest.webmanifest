@@ -1,0 +1,19 @@
+{
+  "name": "My Love — Nhật ký của Phúc và Ánh",
+  "short_name": "My Love",
+  "description": "Nhật ký riêng lưu lại hành trình, ảnh và ghi chú của Phúc và Ánh.",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FAF4EE",
+  "theme_color": "#FAF4EE",
+  "icons": [
+    {
+      "src": "/my-love-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

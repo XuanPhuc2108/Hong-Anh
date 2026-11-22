@@ -1,56 +1,33 @@
 import { useState } from 'react';
 import { Reveal } from '@/components/Reveal';
-import { SectionHeading } from '@/components/SectionHeading';
 import { Lightbox, type LightboxItem } from '@/components/Lightbox';
 import { siteContent, type GalleryImage } from '@/lib/content';
 
-// Placeholder images: khi chưa có ảnh thật, dùng gradient "petal" cards.
-// Khi admin upload ảnh, items sẽ được nạp từ Supabase và thay thế mảng này.
-const placeholderCount = 7;
+// Khi chưa có ảnh thật, hiển thị khung trống trung thực (không bịa ảnh).
+// Khi admin thêm ảnh, items được nạp và thay thế các khung này.
+const placeholderCount = 6;
 
+// Editorial rhythm: first tile dominates, then varied proportions.
 const spanClass: Record<GalleryImage['span'], string> = {
-  tall: 'row-span-2',
-  wide: 'col-span-2',
-  square: '',
-  big: 'col-span-2 row-span-2',
+  big: 'col-span-2 row-span-2 md:col-span-4 md:row-span-3',
+  tall: 'row-span-2 md:col-span-2 md:row-span-3',
+  wide: 'col-span-2 md:col-span-3 md:row-span-2',
+  square: 'md:col-span-2 md:row-span-2',
 };
 
-function PlaceholderTile({ index }: { index: number }) {
-  const gradients = [
-    'from-fuchsia-400 to-fuchsia-600',
-    'from-rose-300 to-fuchsia-500',
-    'from-fuchsia-200 to-rose-400',
-    'from-fuchsia-600 to-fuchsia-800',
-    'from-rose-200 to-fuchsia-400',
-    'from-fuchsia-300 to-fuchsia-500',
-    'from-rose-400 to-fuchsia-600',
-  ];
-  const g = gradients[index % gradients.length];
-  return (
-    <div className={`relative h-full w-full overflow-hidden bg-gradient-to-br ${g}`}>
-      <div className="paper-grain absolute inset-0 opacity-40" />
-      <div className="absolute inset-0 bg-gradient-to-t from-fuchsia-700/30 to-transparent" />
-      <div className="absolute inset-0 grid place-items-center">
-        <span className="font-serif text-5xl font-semibold italic text-white/70">
-          {String(index + 1).padStart(2, '0')}
-        </span>
-      </div>
-    </div>
-  );
-}
+const placeholderSpans: GalleryImage['span'][] = ['big', 'tall', 'square', 'wide', 'square', 'tall'];
 
 export function MemoryGallery() {
   const { gallery } = siteContent;
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  // Build display list: real images first, then placeholders to fill the editorial grid.
   const realImages = gallery.images;
   const tiles: { src?: string; caption?: string; span: GalleryImage['span'] }[] = [
     ...realImages.map((img) => ({ src: img.src, caption: img.caption, span: img.span })),
     ...Array.from({ length: Math.max(0, placeholderCount - realImages.length) }).map((_, i) => ({
       src: undefined,
       caption: undefined,
-      span: (['big', 'tall', 'square', 'wide', 'square', 'tall', 'square'] as const)[i % 7],
+      span: placeholderSpans[(realImages.length + i) % placeholderSpans.length],
     })),
   ];
 
@@ -66,41 +43,42 @@ export function MemoryGallery() {
   };
 
   return (
-    <section id="gallery" className="paper-texture relative py-24 md:py-32">
-      <div className="mx-auto max-w-6xl px-6">
-        <SectionHeading eyebrow={gallery.eyebrow} title={gallery.title} intro={gallery.intro} />
-
-        <div className="mt-12 grid auto-rows-[180px] grid-cols-2 gap-3 sm:gap-4 md:mt-16 md:auto-rows-[220px] md:grid-cols-4">
-          {tiles.map((tile, i) => (
-            <Reveal
-              key={i}
-              delay={((i % 3) + 1) as 1 | 2 | 3}
-              className={`group relative overflow-hidden rounded-2xl shadow-glass ${spanClass[tile.span]}`}
-            >
+    <div>
+      <div className="grid auto-rows-[120px] grid-cols-2 gap-3 sm:auto-rows-[150px] sm:gap-4 md:auto-rows-[88px] md:grid-cols-6 md:gap-5">
+        {tiles.map((tile, i) => (
+          <Reveal
+            key={i}
+            variant="photo"
+            delay={((i % 3) + 1) as 1 | 2 | 3}
+            className={`group relative ${spanClass[tile.span]}`}
+          >
+            {tile.src ? (
               <button
                 onClick={() => openLightbox(i)}
-                className="img-lift block h-full w-full"
+                className="photo-hover block h-full w-full overflow-hidden rounded-[2px] shadow-soft"
                 aria-label={tile.caption ? `Xem ảnh: ${tile.caption}` : 'Xem ảnh'}
               >
-                {tile.src ? (
-                  <img src={tile.src} alt={tile.caption ?? ''} loading="lazy" className="h-full w-full object-cover" />
-                ) : (
-                  <PlaceholderTile index={i} />
+                <img src={tile.src} alt={tile.caption ?? ''} loading="lazy" className="h-full w-full object-cover" />
+                {tile.caption && (
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent p-3 text-left font-serif text-sm italic text-white opacity-0 transition-opacity duration-500 group-hover:opacity-100">
+                    {tile.caption}
+                  </span>
                 )}
               </button>
-              {tile.caption && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-2 bg-gradient-to-t from-ink/70 to-transparent p-3 text-left text-xs text-white opacity-0 transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
-                  {tile.caption}
-                </div>
-              )}
-            </Reveal>
-          ))}
-        </div>
-
-        <p className="mt-8 text-center text-sm text-ink-soft">
-          Chạm vào một ảnh để xem lớn hơn{lightboxItems.length > 0 ? ' — vuốt sang trái/phải để chuyển ảnh.' : '.'}
-        </p>
+            ) : (
+              <div className="frame-empty relative flex h-full w-full items-end overflow-hidden rounded-[2px] p-4">
+                <span className="meta relative z-[1] tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+              </div>
+            )}
+          </Reveal>
+        ))}
       </div>
+
+      <p className="meta mt-6">
+        {lightboxItems.length > 0
+          ? 'Chạm vào một ảnh để xem lớn hơn — vuốt sang trái/phải để chuyển ảnh.'
+          : 'Các khung đang chờ ảnh — thêm ảnh qua trang quản lý.'}
+      </p>
 
       <Lightbox
         items={lightboxItems}
@@ -108,6 +86,6 @@ export function MemoryGallery() {
         onClose={() => setLightboxIndex(null)}
         onNavigate={setLightboxIndex}
       />
-    </section>
+    </div>
   );
 }

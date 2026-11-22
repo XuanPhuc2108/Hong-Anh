@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="paper" x1="120" y1="60" x2="1080" y2="570" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFCF8" stop-opacity=".96"/>
+      <stop offset=".55" stop-color="#FFF5F6" stop-opacity=".86"/>
+      <stop offset="1" stop-color="#F6D6E1" stop-opacity=".72"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="82" y1="72" x2="1118" y2="558" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/>
+      <stop offset=".52" stop-color="#EFC4D2"/>
+      <stop offset="1" stop-color="#B8325F" stop-opacity=".44"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#FBF6F1"/>
+  <circle cx="1040" cy="130" r="250" fill="#EFC4D2" fill-opacity=".26"/>
+  <circle cx="1080" cy="590" r="330" fill="#D47797" fill-opacity=".14"/>
+  <rect x="57" y="55" width="1086" height="520" rx="26" fill="url(#paper)" stroke="url(#edge)" stroke-width="2"/>
+  <rect x="72" y="70" width="1056" height="490" rx="19" stroke="#fff" stroke-opacity=".72"/>
+  <path d="M108 122H310" stroke="#B8325F" stroke-opacity=".55"/>
+  <text x="108" y="163" fill="#8A425B" font-family="'Be Vietnam Pro', Arial, sans-serif" font-size="17" letter-spacing="4">MY LOVE · 2026</text>
+  <text x="104" y="315" fill="#3B1F2B" font-family="'Noto Serif', Georgia, serif" font-size="68" font-weight="400" letter-spacing="-2">Nhật ký của Phúc &amp; Ánh</text>
+  <text x="108" y="374" fill="#8A425B" font-family="'Dancing Script', cursive" font-size="36">những trang dành cho hai người</text>
+  <path d="M108 426H630" stroke="#B8325F" stroke-opacity=".48"/>
+  <text x="108" y="475" fill="#684B54" font-family="'Be Vietnam Pro', Arial, sans-serif" font-size="22">Hành trình, ảnh và ghi chú đã lưu.</text>
+  <circle cx="1030" cy="456" r="43" fill="#B8325F" fill-opacity=".12"/>
+  <path d="M1013 440C1022 431 1038 431 1047 440V477C1038 469 1022 469 1013 477V440Z" stroke="#8A425B" stroke-width="2"/>
+  <path d="M1030 438V472" stroke="#8A425B" stroke-width="2"/>
+  <text x="108" y="526" fill="#8A425B" font-family="'Be Vietnam Pro', Arial, sans-serif" font-size="13" letter-spacing="2">NHỮNG NGÀY ĐÃ ĐƯỢC LƯU LẠI</text>
+</svg>

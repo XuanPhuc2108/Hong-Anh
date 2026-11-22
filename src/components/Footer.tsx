@@ -1,17 +1,18 @@
-import { Heart } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
+import { BrandMark } from '@/components/BrandMark';
 
-type FooterProps = { content: { eyebrow: string; title: string; body: string } };
-
-export function Footer({ content }: FooterProps) {
+export function Footer() {
   return (
-    <footer className="paper-texture relative z-10 px-6 py-10 text-center safe-pb">
-      <div className="mx-auto flex max-w-2xl flex-col items-center gap-3">
-        <span className="flex items-center gap-2 text-xs text-ink-soft">
-          <Heart size={13} className="text-fuchsia-500" />
-          <span>Nhật ký nhỏ cho Ánh</span>
-        </span>
-        <p className="text-xs text-ink-soft/80">{content.title}</p>
+    <footer className="site-footer">
+      <div className="site-footer__inner">
+        <a href="#hero" className="site-footer__brand">
+          <BrandMark className="site-footer__mark" />
+          <span>My Love</span>
+        </a>
+        <p>Góc nhỏ cất lại ngày tháng của Phúc &amp; Ánh.</p>
+        <a href="#hero" className="site-footer__top">Lên đầu trang nè <ArrowUpRight size={16} aria-hidden /></a>
       </div>
+      <span className="site-footer__line" aria-hidden />
     </footer>
   );
 }

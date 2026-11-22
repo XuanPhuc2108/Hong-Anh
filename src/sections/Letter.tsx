@@ -1,27 +1,72 @@
-import { Reveal } from '@/components/Reveal';
-import { siteContent } from '@/lib/content';
+import { useState, type FormEvent } from 'react';
+import { Check, Feather, MailOpen, Mail } from 'lucide-react';
+import { useSound } from '@/components/SoundContext';
+import { useDeviceValue } from '@/lib/deviceStorage';
 
-export function Letter() {
-  const { letter } = siteContent;
+type LetterSettings = { title: string; body: string; signature: string };
+type LetterDraft = { body: string; signature: string };
+
+export function Letter({ initialLetter }: { initialLetter: LetterSettings }) {
+  const [open, setOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [draft, setDraft, storageError] = useDeviceValue<LetterDraft>('my-love:letter-draft:v1', {
+    body: initialLetter.body,
+    signature: initialLetter.signature,
+  });
+  const { playSound } = useSound();
+
+  const toggleLetter = () => {
+    if (!open) playSound('letter');
+    setOpen((value) => !value);
+  };
+  const saveDraft = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2400);
+  };
+
   return (
-    <section id="letter" className="paper-texture relative py-24 md:py-32">
-      <div className="mx-auto max-w-3xl px-6">
-        <Reveal className="relative">
-          {/* decorative paper stack */}
-          <div className="absolute -inset-x-2 -inset-y-2 -z-10 rotate-[-1.5deg] rounded-3xl bg-fuchsia-100/60" />
-          <div className="absolute -inset-x-1 -inset-y-1 -z-10 rotate-[1deg] rounded-3xl bg-fuchsia-200/50" />
-
-          <article className="paper-grain rounded-3xl bg-paper-pale p-8 shadow-soft-lg sm:p-12 md:p-16">
-            <span className="eyebrow">{letter.eyebrow}</span>
-            <h2 className="mt-4 font-serif text-4xl font-semibold italic text-ink sm:text-5xl">
-              {letter.title}
-            </h2>
-            <div className="mt-8 space-y-6 text-pretty text-base leading-[1.85] text-ink sm:text-lg">
-              <p>{letter.body}</p>
-            </div>
-            <p className="mt-10 font-hand text-2xl text-fuchsia-700">{letter.signature}</p>
-          </article>
-        </Reveal>
+    <section id="letter" className={`letter-experience ${open ? 'is-open' : ''}`} aria-labelledby="letter-title">
+      <div className="letter-envelope" aria-hidden>
+        <div className="letter-envelope__paper">
+          <Feather size={22} />
+        </div>
+        <div className="letter-envelope__flap" />
+        <span className="letter-envelope__seal"><Mail size={18} /></span>
+      </div>
+      <div className="letter-copy">
+        <span className="section-kicker">Một bức thư</span>
+        <h3 id="letter-title">{initialLetter.title}</h3>
+        <p>{initialLetter.body ? 'Bức thư đang được cất trong My Love.' : 'Trang thư vẫn còn chỗ trống nè.'}</p>
+        <button type="button" className="letter-toggle" onClick={toggleLetter} aria-expanded={open} aria-controls="letter-content">
+          {open ? <MailOpen size={17} aria-hidden /> : <Mail size={17} aria-hidden />}
+          {open ? 'Gấp thư lại' : initialLetter.body ? 'Mở thư nè' : 'Viết vài dòng'}
+        </button>
+      </div>
+      <div id="letter-content" className="letter-content" hidden={!open}>
+        <form onSubmit={saveDraft}>
+          <label htmlFor="letter-body">Nội dung bức thư</label>
+          <textarea
+            id="letter-body"
+            rows={7}
+            maxLength={4000}
+            value={draft.body}
+            onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}
+          />
+          <label htmlFor="letter-signature">Tên người gửi</label>
+          <input
+            id="letter-signature"
+            value={draft.signature}
+            maxLength={80}
+            onChange={(event) => setDraft((current) => ({ ...current, signature: event.target.value }))}
+          />
+          <div className="letter-save-row">
+            <button type="submit" className="letter-save"><Check size={16} aria-hidden /> Cất bản nháp</button>
+            <span className="letter-save-status" role="status" aria-live="polite">
+              {saved ? 'Bản nháp đã cất trên thiết bị này nè.' : storageError || 'Thư vẫn ở trên thiết bị này thôi nha.'}
+            </span>
+          </div>
+        </form>
       </div>
     </section>
   );
