@@ -15,7 +15,7 @@ const spanClass: Record<GalleryImage['span'], string> = {
   big: 'col-span-2 row-span-2',
 };
 
-function PlaceholderTile({ index, span }: { index: number; span: GalleryImage['span'] }) {
+function PlaceholderTile({ index }: { index: number }) {
   const gradients = [
     'from-fuchsia-400 to-fuchsia-600',
     'from-rose-300 to-fuchsia-500',
@@ -85,7 +85,7 @@ export function MemoryGallery() {
                 {tile.src ? (
                   <img src={tile.src} alt={tile.caption ?? ''} loading="lazy" className="h-full w-full object-cover" />
                 ) : (
-                  <PlaceholderTile index={i} span={tile.span} />
+                  <PlaceholderTile index={i} />
                 )}
               </button>
               {tile.caption && (
