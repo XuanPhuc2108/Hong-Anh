@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export type LightboxItem = { src: string; caption?: string };
@@ -13,6 +13,10 @@ type LightboxProps = {
 export function Lightbox({ items, index, onClose, onNavigate }: LightboxProps) {
   const open = index !== null;
   const current = open ? items[index!] : null;
+  const touchX = useRef<number | null>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   const next = useCallback(
     (dir: number) => {
@@ -23,74 +27,123 @@ export function Lightbox({ items, index, onClose, onNavigate }: LightboxProps) {
     [index, items.length, onNavigate]
   );
 
+  const actionsRef = useRef({ onClose, next });
+  actionsRef.current = { onClose, next };
+
   useEffect(() => {
     if (!open) return;
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowRight') next(1);
-      if (e.key === 'ArrowLeft') next(-1);
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        actionsRef.current.onClose();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        actionsRef.current.next(1);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        actionsRef.current.next(-1);
+      } else if (e.key === 'Tab') {
+        const controls = [...(dialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') ?? [])]
+          .filter((button) => button.getClientRects().length > 0);
+        if (controls.length === 0) {
+          e.preventDefault();
+          return;
+        }
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (e.shiftKey && (document.activeElement === first || !dialogRef.current?.contains(document.activeElement))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (document.activeElement === last || !dialogRef.current?.contains(document.activeElement))) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
+    closeRef.current?.focus();
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousOverflow;
+      if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus();
     };
-  }, [open, next, onClose]);
+  }, [open]);
 
   if (!open || !current) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+      ref={dialogRef}
+      className="lb-enter fixed inset-0 z-50 flex flex-col items-center justify-center px-4 py-16"
       onClick={onClose}
+      onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
+      onTouchEnd={(e) => {
+        if (touchX.current === null || items.length < 2) return;
+        const dx = e.changedTouches[0].clientX - touchX.current;
+        if (Math.abs(dx) > 50) next(dx < 0 ? 1 : -1);
+        touchX.current = null;
+      }}
       role="dialog"
       aria-modal="true"
+      aria-label={current.caption ?? 'Xem ảnh trong kho My Love'}
     >
-      <div className="absolute inset-0 bg-ink/80 backdrop-blur-2xl" />
+      <div className="absolute inset-0 bg-[#1e1016]/65 backdrop-blur-xl" />
 
-      {/* Controls */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onClose(); }}
-        className="glass-dark glass-specular btn-tactile absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-full text-white safe-top"
-        aria-label="Đóng"
-      >
-        <X size={20} />
-      </button>
+      <div className="safe-pt absolute inset-x-0 top-0 z-10 flex items-center justify-between px-4 pt-3">
+        <span className="meta text-white/70 tabular-nums">
+          {items.length > 1 ? `${String(index! + 1).padStart(2, '0')} / ${String(items.length).padStart(2, '0')}` : ''}
+        </span>
+        <button
+          ref={closeRef}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="lg-dark btn-tactile grid h-11 w-11 place-items-center rounded-full"
+          aria-label="Đóng ảnh nè"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
       {items.length > 1 && (
         <>
           <button
-            onClick={(e) => { e.stopPropagation(); next(-1); }}
-            className="glass-dark glass-specular btn-tactile absolute left-2 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full text-white sm:left-4"
-            aria-label="Ảnh trước"
+            onClick={(e) => {
+              e.stopPropagation();
+              next(-1);
+            }}
+            className="lg-dark btn-tactile absolute left-3 top-1/2 z-10 hidden h-12 w-12 -translate-y-1/2 place-items-center rounded-full sm:grid"
+            aria-label="Xem ảnh trước"
           >
-            <ChevronLeft size={22} />
+            <ChevronLeft size={20} />
           </button>
           <button
-            onClick={(e) => { e.stopPropagation(); next(1); }}
-            className="glass-dark glass-specular btn-tactile absolute right-2 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full text-white sm:right-4"
-            aria-label="Ảnh sau"
+            onClick={(e) => {
+              e.stopPropagation();
+              next(1);
+            }}
+            className="lg-dark btn-tactile absolute right-3 top-1/2 z-10 hidden h-12 w-12 -translate-y-1/2 place-items-center rounded-full sm:grid"
+            aria-label="Xem ảnh kế tiếp"
           >
-            <ChevronRight size={22} />
+            <ChevronRight size={20} />
           </button>
         </>
       )}
 
-      {/* Image */}
       <figure
-        className="relative z-[1] flex max-h-full max-w-4xl flex-col items-center animate-scale-in"
+        key={current.src}
+        className="lb-photo relative z-[1] flex max-h-full max-w-5xl flex-col items-center gap-4"
         onClick={(e) => e.stopPropagation()}
       >
         <img
           src={current.src}
           alt={current.caption ?? ''}
-          className="max-h-[80vh] max-w-full rounded-2xl object-contain shadow-soft-lg"
+          className="max-h-[76vh] max-w-full rounded-sm object-contain shadow-soft-lg"
         />
-        {current.caption && (
-          <figcaption className="glass glass-specular mt-4 rounded-full px-5 py-2 text-sm text-ink safe-bottom">
-            {current.caption}
-          </figcaption>
-        )}
       </figure>
     </div>
   );

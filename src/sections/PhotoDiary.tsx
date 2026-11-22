@@ -1,56 +1,52 @@
 import { Reveal } from '@/components/Reveal';
-import { SectionHeading } from '@/components/SectionHeading';
-import { siteContent } from '@/lib/content';
+import { siteContent, type DiaryEntry } from '@/lib/content';
 
-// Scrapbook layout: each entry is a "polaroid" with a slight rotation and caption underneath.
-function DiaryCard({ entry, index }: { entry: { id: string; date: string; caption: string; photo: string }; index: number }) {
-  const rotate = index % 2 === 0 ? '-rotate-2' : 'rotate-2';
+function DiaryPage({ entry, index }: { entry: DiaryEntry; index: number }) {
+  const feature = index % 3 === 0;
   return (
-    <Reveal
-      as="figure"
-      delay={((index % 3) + 1) as 1 | 2 | 3}
-      className={`paper-grain relative bg-white p-3 pb-4 shadow-soft-lg ${rotate} hover:rotate-0 transition-transform duration-500`}
-    >
-      <span className="absolute -top-3 left-1/2 h-6 w-20 -translate-x-1/2 rounded-sm bg-fuchsia-200/70 shadow-sm backdrop-blur-sm" />
-      <div className="relative aspect-square overflow-hidden bg-fuchsia-100">
-        <img src={entry.photo} alt={entry.caption} loading="lazy" className="h-full w-full object-cover" />
+    <Reveal as="article" delay={((index % 3) + 1) as 1 | 2 | 3} className={feature ? 'sm:col-span-2' : ''}>
+      <div className={`grid gap-5 ${feature ? 'sm:grid-cols-[1.4fr_1fr] sm:items-end' : ''}`}>
+        <figure className="photo-hover overflow-hidden rounded-[2px] shadow-soft">
+          <img
+            src={entry.photo}
+            alt={entry.caption}
+            loading="lazy"
+            className={`w-full object-cover ${feature ? 'aspect-[4/3]' : 'aspect-[4/5]'}`}
+          />
+        </figure>
+        <div>
+          <time className="eyebrow">{entry.date}</time>
+          <p className="mt-2 font-serif text-xl leading-snug text-ink">{entry.caption}</p>
+        </div>
       </div>
-      <figcaption className="mt-3 px-1">
-        <p className="font-hand text-lg text-ink">{entry.caption}</p>
-        <p className="mt-1 text-xs tracking-wide text-ink-soft">{entry.date}</p>
-      </figcaption>
     </Reveal>
   );
 }
 
 function EmptyDiary() {
   return (
-    <Reveal className="glass glass-specular mt-12 rounded-3xl p-10 text-center shadow-glass">
-      <p className="font-serif text-xl text-ink">Trang nhật ký đang đợi những bức ảnh đầu tiên</p>
-      <p className="mx-auto mt-3 max-w-md text-sm text-ink-soft">
-        Sau khi đăng nhập trang quản lý, bạn có thể thêm từng trang — ảnh, chú thích và ngày tháng.
-      </p>
+    <Reveal className="sheet grid gap-8 rounded-[2px] p-8 shadow-soft sm:grid-cols-[1fr_1.2fr] sm:p-12">
+      <div className="frame-empty relative aspect-[4/5] rounded-[2px]" aria-hidden />
+      <div className="flex flex-col justify-center">
+        <span className="eyebrow">Trang trống</span>
+        <p className="display mt-4 text-3xl text-ink sm:text-4xl">Trang nhật ký đang đợi những bức ảnh đầu tiên</p>
+        <p className="mt-4 max-w-sm text-pretty text-base leading-relaxed text-ink-soft">
+          Sau khi đăng nhập trang quản lý, bạn có thể thêm từng trang — ảnh, chú thích và ngày tháng.
+        </p>
+      </div>
     </Reveal>
   );
 }
 
 export function PhotoDiary() {
   const { diary } = siteContent;
-  return (
-    <section id="diary" className="paper-texture relative py-24 md:py-32">
-      <div className="mx-auto max-w-6xl px-6">
-        <SectionHeading eyebrow={diary.eyebrow} title={diary.title} intro={diary.intro} />
-
-        {diary.entries.length > 0 ? (
-          <div className="mt-12 grid gap-8 sm:grid-cols-2 md:mt-16 lg:grid-cols-3">
-            {diary.entries.map((entry, i) => (
-              <DiaryCard key={entry.id} entry={entry} index={i} />
-            ))}
-          </div>
-        ) : (
-          <EmptyDiary />
-        )}
-      </div>
-    </section>
+  return diary.entries.length > 0 ? (
+    <div className="grid gap-x-8 gap-y-14 sm:grid-cols-2">
+      {diary.entries.map((entry, i) => (
+        <DiaryPage key={entry.id} entry={entry} index={i} />
+      ))}
+    </div>
+  ) : (
+    <EmptyDiary />
   );
 }

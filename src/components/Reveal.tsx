@@ -6,18 +6,20 @@ type RevealProps = {
   className?: string;
   delay?: 1 | 2 | 3 | 4 | 5;
   as?: 'div' | 'section' | 'article' | 'li' | 'figure';
+  variant?: 'rise' | 'photo';
 };
 
 /**
- * Wrap children with a scroll-triggered reveal.
- * Adds `.reveal` + `.is-visible` toggles defined in index.css.
+ * Scroll-triggered reveal. `rise` fades content up; `photo` wipes an image
+ * open from the bottom like a print developing. Styles live in index.css.
  */
-export function Reveal({ children, className = '', delay, as = 'div' }: RevealProps) {
+export function Reveal({ children, className = '', delay, as = 'div', variant = 'rise' }: RevealProps) {
   const { ref, visible } = useScrollReveal();
+  const base = variant === 'photo' ? 'reveal-photo' : 'reveal';
   const delayClass = delay ? ` reveal-delay-${delay}` : '';
   const Tag = as as 'div';
   return (
-    <Tag ref={ref as never} className={`reveal${delayClass} ${visible ? 'is-visible' : ''} ${className}`}>
+    <Tag ref={ref as never} className={`${base}${delayClass} ${visible ? 'is-visible' : ''} ${className}`}>
       {children}
     </Tag>
   );
