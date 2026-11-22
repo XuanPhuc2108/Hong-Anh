@@ -1,4 +1,3 @@
-import { useCallback, useState } from 'react';
 import { FloatingNav } from '@/components/FloatingNav';
 import { Footer } from '@/components/Footer';
 import { AmbientLight } from '@/components/AmbientLight';
@@ -14,13 +13,10 @@ import { NextChapter } from '@/sections/NextChapter';
 import { siteContent } from '@/lib/content';
 
 function App() {
-  const [booted, setBooted] = useState(false);
-  const handleDone = useCallback(() => setBooted(true), []);
-
   return (
     <div className="relative min-h-screen">
       <AmbientLight />
-      <LoadingScreen onDone={handleDone} />
+      <LoadingScreen onDone={() => undefined} />
       <ScrollProgress />
       <FloatingNav />
       <main className="relative z-10">
