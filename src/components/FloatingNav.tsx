@@ -14,18 +14,24 @@ const SECTIONS = [
   { id: 'soundtrack', label: 'Nhạc' },
   { id: 'corner', label: 'Góc nhỏ' },
 ];
-const SECTION_IDS = SECTIONS.map((section) => section.id);
 
 export function FloatingNav({
+  mode = 'member',
+  onRequestSignIn,
   identity,
   onSignOut,
 }: {
-  identity: CoupleIdentity;
-  onSignOut: () => Promise<void>;
+  mode?: 'member' | 'guest';
+  onRequestSignIn?: (returnTo?: string) => void;
+  identity?: CoupleIdentity;
+  onSignOut?: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [accountError, setAccountError] = useState('');
-  const active = useActiveSection(SECTION_IDS);
+  const sections = mode === 'guest'
+    ? SECTIONS.filter((section) => ['hero', 'spaces', 'corner'].includes(section.id))
+    : SECTIONS;
+  const active = useActiveSection(sections.map((section) => section.id));
   const glassRef = useGlassPointer<HTMLDivElement>();
   const panelRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -66,6 +72,7 @@ export function FloatingNav({
     updatePreferences({ enabled: !preferences.enabled });
   };
   const signOut = () => {
+    if (!onSignOut) return;
     setAccountError('');
     void onSignOut().catch((error: unknown) => {
       console.error('Không đăng xuất được.', error);
@@ -83,7 +90,7 @@ export function FloatingNav({
             <span>My Love</span>
           </a>
           <nav className="site-nav__links" aria-label="Điều hướng chính">
-            {SECTIONS.map((section) => (
+            {sections.map((section) => (
               <a
                 key={section.id}
                 href={`#${section.id}`}
@@ -95,6 +102,11 @@ export function FloatingNav({
             ))}
           </nav>
           <div className="site-nav__actions">
+            {mode === 'guest' && (
+              <button type="button" className="site-nav__login" onClick={() => onRequestSignIn?.()}>
+                Đăng nhập
+              </button>
+            )}
             <button type="button" className="nav-sound-toggle" onClick={toggleSound} aria-label={preferences.enabled ? 'Tắt âm thanh giao diện' : 'Bật âm thanh giao diện'}>
               {preferences.enabled ? <Volume2 size={17} /> : <VolumeX size={17} />}
             </button>
@@ -116,21 +128,34 @@ export function FloatingNav({
           <div className="site-nav__panel-inner lg">
             <p className="site-nav__panel-title">Chọn một mục</p>
             <nav className="site-nav__panel-links" aria-label="Các phần trong My Love">
-              {SECTIONS.map((section, index) => (
+              {sections.map((section, index) => (
                 <a key={section.id} href={`#${section.id}`} onClick={closeAfterNavigation}>
                   <span>{String(index + 1).padStart(2, '0')}</span>
                   {section.label}
                 </a>
               ))}
             </nav>
-            <SoundControls />
-            <div className="site-nav__account">
-              <span>Đang đăng nhập: {identity.name}</span>
-              <button type="button" className="photo-button photo-button--quiet" onClick={signOut}>
-                Đăng xuất
-              </button>
-              {accountError && <p role="alert">{accountError}</p>}
-            </div>
+            {mode === 'member' ? (
+              <>
+                <SoundControls />
+                {identity && onSignOut && (
+                  <div className="site-nav__account">
+                    <span>Đang đăng nhập: {identity.name}</span>
+                    <button type="button" className="photo-button photo-button--quiet" onClick={signOut}>
+                      Đăng xuất
+                    </button>
+                    {accountError && <p role="alert">{accountError}</p>}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="site-nav__account">
+                <span>Đang tham quan với quyền khách</span>
+                <button type="button" className="photo-button photo-button--quiet" onClick={() => onRequestSignIn?.()}>
+                  Đăng nhập để mở khóa
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>

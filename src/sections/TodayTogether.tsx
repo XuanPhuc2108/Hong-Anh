@@ -20,8 +20,9 @@ function displayDate(date?: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) ? formatDateOnly(date) : date;
 }
 
-export function TodayTogether() {
+export function TodayTogether({ userId }: { userId: string }) {
   const todayKey = getTodayKey();
+  const storageKey = `my-love:today:${userId}:${todayKey}`;
   const date = useMemo(() => new Date(`${todayKey}T12:00:00+07:00`), [todayKey]);
   const questionIndex = Math.floor(date.getTime() / 86_400_000) % DAILY_QUESTIONS.length;
   const question = DAILY_QUESTIONS[questionIndex];
@@ -31,7 +32,7 @@ export function TodayTogether() {
 
   useEffect(() => {
     try {
-      const savedAnswer = window.localStorage.getItem(`my-love:today:${todayKey}`);
+      const savedAnswer = window.localStorage.getItem(storageKey);
       if (savedAnswer !== null) {
         setAnswer(savedAnswer);
         setSaved(true);
@@ -40,7 +41,7 @@ export function TodayTogether() {
       console.error('Không đọc được câu trả lời trong ngày trên thiết bị.', error);
       setStatus('Không đọc được câu trả lời đã lưu. Bạn vẫn có thể viết câu mới.');
     }
-  }, [todayKey]);
+  }, [storageKey, todayKey]);
 
   const saveAnswer = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -50,7 +51,7 @@ export function TodayTogether() {
       return;
     }
     try {
-      window.localStorage.setItem(`my-love:today:${todayKey}`, value);
+      window.localStorage.setItem(storageKey, value);
       setAnswer(value);
       setSaved(true);
       setStatus('Đã lưu trên thiết bị này.');

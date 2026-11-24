@@ -9,12 +9,13 @@ import { Hero } from '@/sections/Hero';
 import { RelationshipCounter } from '@/sections/RelationshipCounter';
 import { JournalMoment } from '@/sections/JournalMoment';
 import { OurStory } from '@/sections/OurStory';
-import { JournalSpaces } from '@/sections/JournalSpaces';
+import { GuestJournalSpaces, JournalSpaces } from '@/sections/JournalSpaces';
 import { OurSoundtrack } from '@/sections/OurSoundtrack';
 import { Corner } from '@/sections/Corner';
 import { TodayTogether } from '@/sections/TodayTogether';
-import { CoupleAuthGate } from '@/components/CoupleAuthGate';
+import { CoupleAuthGate, type CoupleAccess } from '@/components/CoupleAuthGate';
 import type { CoupleIdentity } from '@/lib/photoLetterRepository';
+import { GuestLetterPreview } from '@/sections/Letter';
 
 type Phase = 'opening' | 'loading' | 'error' | 'site';
 
@@ -42,9 +43,11 @@ async function preloadThumbnails(sources: string[]) {
 
 function AppContent({
   identity,
+  initialSection,
   onSignOut,
 }: {
   identity: CoupleIdentity;
+  initialSection: string | null;
   onSignOut: () => Promise<void>;
 }) {
   const [phase, setPhase] = useState<Phase>('opening');
@@ -74,8 +77,8 @@ function AppContent({
       setStatus('Đang tải kỷ niệm.');
 
       const thumbnails = [
-        ...journal.gallery.slice(0, 3).map((image) => image.public_url),
-        ...journal.diary.slice(0, 1).map((image) => image.public_url),
+        ...journal.gallery.slice(0, 3).map((image) => image.signed_url),
+        ...journal.diary.slice(0, 1).map((image) => image.signed_url),
       ];
       await preloadThumbnails(thumbnails);
       setProgress(100);
@@ -106,6 +109,13 @@ function AppContent({
       window.setTimeout(() => root.classList.add('m-enter-done'), 700);
     });
   }, [phase]);
+
+  useEffect(() => {
+    if (phase !== 'site' || !initialSection) return;
+    requestAnimationFrame(() => {
+      document.getElementById(initialSection)?.scrollIntoView({ block: 'start' });
+    });
+  }, [phase, initialSection]);
 
   useEffect(() => {
     if (phase !== 'site') return;
@@ -148,7 +158,7 @@ function AppContent({
       <FloatingNav identity={identity} onSignOut={onSignOut} />
       <main id="main" tabIndex={-1} className="site-content">
         <Hero />
-        <TodayTogether />
+        <TodayTogether userId={identity.userId} />
         <RelationshipCounter />
         <JournalMoment />
         <OurStory memories={data.memories} />
@@ -166,10 +176,35 @@ function AppContent({
   );
 }
 
+function GuestContent({ onRequestSignIn }: Extract<CoupleAccess, { mode: 'guest' }>) {
+  return (
+    <div className="my-love-app" data-connected="false" data-access="guest">
+      <a href="#main" className="skip-link">Bỏ qua đến nội dung chính</a>
+      <AmbientLight />
+      <FloatingNav mode="guest" onRequestSignIn={onRequestSignIn} />
+      <main id="main" tabIndex={-1} className="site-content">
+        <Hero mode="guest" />
+        <GuestJournalSpaces onRequestSignIn={onRequestSignIn} />
+        <GuestLetterPreview onRequestSignIn={onRequestSignIn} />
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <CoupleAuthGate>
-      {(identity, onSignOut) => <AppContent identity={identity} onSignOut={onSignOut} />}
+      {(access) => access.mode === 'guest'
+        ? <GuestContent {...access} />
+        : (
+          <AppContent
+            key={access.identity.userId}
+            identity={access.identity}
+            initialSection={access.initialSection}
+            onSignOut={access.onSignOut}
+          />
+        )}
     </CoupleAuthGate>
   );
 }

@@ -4,9 +4,9 @@ import { useSound } from '@/components/SoundContext';
 import { RefractiveImageLens } from '@/components/RefractiveImageLens';
 import { BotanicalAccent } from '@/components/BotanicalAccent';
 
-export function Hero() {
+export function Hero({ mode = 'member' }: { mode?: 'member' | 'guest' }) {
   const { playSound } = useSound();
-  const typewriter = useTypewriter('Hôm nay có gì vui?', 420, 72, () => playSound('key'));
+  const typewriter = useTypewriter('Nay có dì dui hông', 420, 72, () => playSound('key'));
   const artRef = useRef<HTMLDivElement>(null);
   const coverRef = useRef<HTMLImageElement>(null);
 
@@ -15,12 +15,16 @@ export function Hero() {
       <div className="hero-grid">
         <div className="hero-copy">
           <h1 id="hero-title">Nhật ký của<br /><em>Phúc &amp; Ánh.</em></h1>
-          <p className="hero-type" aria-label={typewriter.done ? undefined : 'Những trang dành cho Phúc và Ánh'}>
+          <p className="hero-type" aria-label={typewriter.done ? undefined : 'Nay có dì dui hông'}>
             {typewriter.output}<span className="type-cursor" aria-hidden />
           </p>
           <div className="hero-actions">
-            <a className="hero-primary" href="#journey">Xem hành trình <span aria-hidden>↘</span></a>
-            <a className="hero-secondary" href="#spaces">Mở kho ảnh</a>
+            <a className="hero-primary" href={mode === 'guest' ? '#spaces' : '#journey'}>
+              {mode === 'guest' ? 'Xem ba album' : 'Xem hành trình'} <span aria-hidden>↘</span>
+            </a>
+            <a className="hero-secondary" href={mode === 'guest' ? '#corner' : '#spaces'}>
+              {mode === 'guest' ? 'Thư tay' : 'Mở kho ảnh'}
+            </a>
           </div>
         </div>
         <div ref={artRef} className="hero-art" data-enter-media>
@@ -50,7 +54,7 @@ export function Hero() {
           <BotanicalAccent kind="flower" className="hero-art__flower" />
         </div>
       </div>
-      <a className="hero-scroll" href="#counter">
+      <a className="hero-scroll" href={mode === 'guest' ? '#spaces' : '#counter'}>
         <span>Cuộn xuống để xem tiếp</span>
         <span className="hero-scroll__line" aria-hidden />
       </a>

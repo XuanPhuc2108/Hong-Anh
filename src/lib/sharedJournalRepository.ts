@@ -1,9 +1,10 @@
 import { supabase } from '@/lib/supabase';
 import {
-  photoLetterRepository,
+  photoLetterRepositoryFor,
   type CoupleIdentity,
   type GalleryImage,
   type LoveLetter,
+  type PhotoLetterRepository,
   type SharedJournalRepository,
 } from '@/lib/photoLetterRepository';
 
@@ -124,7 +125,11 @@ export async function fetchCoupleIdentity(userId: string): Promise<CoupleIdentit
 }
 
 export class SupabaseSharedJournalRepository implements SharedJournalRepository {
-  constructor(private readonly identity: CoupleIdentity) {}
+  private readonly localRepository: PhotoLetterRepository;
+
+  constructor(private readonly identity: CoupleIdentity) {
+    this.localRepository = photoLetterRepositoryFor(identity.userId);
+  }
 
   private requirePartner() {
     if (!this.identity.partnerId || !this.identity.partnerName) {
@@ -334,7 +339,7 @@ export class SupabaseSharedJournalRepository implements SharedJournalRepository 
       .select(LETTER_SELECT)
         .order('sent_at', { ascending: false })
         .returns<LetterRow[]>(),
-      photoLetterRepository.listLetters(),
+      this.localRepository.listLetters(),
     ]);
     if (error) throw error;
 
@@ -348,7 +353,7 @@ export class SupabaseSharedJournalRepository implements SharedJournalRepository 
   }
 
   async listLegacyLocalLetters() {
-    const letters = await photoLetterRepository.listLetters();
+    const letters = await this.localRepository.listLetters();
     return letters.filter((letter) => letter.status !== 'draft' && letter.from === this.identity.name);
   }
 
@@ -361,12 +366,12 @@ export class SupabaseSharedJournalRepository implements SharedJournalRepository 
       status: 'draft',
       updatedAt: new Date().toISOString(),
     };
-    await photoLetterRepository.saveLetter(draft);
+    await this.localRepository.saveLetter(draft);
     return draft;
   }
 
   async deleteDraft(id: string) {
-    await photoLetterRepository.deleteLetter(id);
+    await this.localRepository.deleteLetter(id);
   }
 
   private async findLegacyLetter(sourceId: string) {
@@ -457,7 +462,7 @@ export class SupabaseSharedJournalRepository implements SharedJournalRepository 
 
       if (letter.status === 'draft') {
         try {
-          await photoLetterRepository.deleteLetter(letter.id);
+          await this.localRepository.deleteLetter(letter.id);
         } catch (cleanupError) {
           console.error('Thư đã gửi nhưng chưa xóa được bản nháp cũ trên thiết bị.', cleanupError);
         }
@@ -480,7 +485,7 @@ export class SupabaseSharedJournalRepository implements SharedJournalRepository 
   async importLegacyLetter(letter: LoveLetter) {
     const sent = await this.sendLetter({ ...letter, status: 'sent' }, letter.id);
     try {
-      await photoLetterRepository.deleteLetter(letter.id);
+      await this.localRepository.deleteLetter(letter.id);
     } catch (error) {
       console.error('Thư đã nằm trong hộp thư chung nhưng chưa xóa được bản cũ trên thiết bị.', error);
     }

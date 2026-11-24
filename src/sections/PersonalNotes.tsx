@@ -10,8 +10,8 @@ function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function PersonalNotes({ notes, stories }: { notes: NoteRecord[]; stories: StoryRecord[] }) {
-  const [localNotes, setLocalNotes, storageError] = useDeviceValue<LocalNote[]>(STORAGE_KEY, []);
+export function PersonalNotes({ notes, stories, userId }: { notes: NoteRecord[]; stories: StoryRecord[]; userId: string }) {
+  const [localNotes, setLocalNotes, storageError] = useDeviceValue<LocalNote[]>(`${STORAGE_KEY}:${userId}`, []);
   const [draft, setDraft] = useState({ title: '', body: '' });
   const [editing, setEditing] = useState<LocalNote | null>(null);
 

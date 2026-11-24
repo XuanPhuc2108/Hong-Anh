@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Flower2, Heart, Images, Plus, Sparkles } from 'lucide-react';
+import { Flower2, Heart, Images, LockKeyhole, Plus, Sparkles } from 'lucide-react';
 import { Lightbox, type LightboxItem } from '@/components/Lightbox';
 import { PhotoDetailDialog } from '@/components/PhotoDetailDialog';
 import { PhotoUploadDialog } from '@/components/PhotoUploadDialog';
 import { formatPhotoDate } from '@/lib/imageFiles';
 import {
   GALLERY_ALBUMS,
-  photoLetterRepository,
+  photoLetterRepositoryFor,
   type CoupleIdentity,
   type GalleryAlbum,
   type GalleryAlbumId,
@@ -66,6 +66,80 @@ function SpaceGlyph({ id }: { id: GalleryAlbumId }) {
   );
 }
 
+export function GuestJournalSpaces({ onRequestSignIn }: { onRequestSignIn: (returnTo?: string) => void }) {
+  const [activeSpace, setActiveSpace] = useState<GalleryAlbumId>('together');
+  const album = GALLERY_ALBUMS.find((item) => item.id === activeSpace) ?? GALLERY_ALBUMS[0];
+  const Icon = SPACE_ICONS[activeSpace];
+
+  return (
+    <section className="spaces-section section-anchor guest-spaces" id="spaces" aria-labelledby="guest-spaces-title">
+      <div className="spaces-wrap">
+        <div className="section-lead section-lead--wide">
+          <span className="section-kicker">Kho ảnh</span>
+          <h2 id="guest-spaces-title">Ba không gian ảnh</h2>
+          <p>Ba cuốn album riêng, mỗi cuốn lưu một phần câu chuyện của Phúc và Ánh.</p>
+        </div>
+
+        <div className="space-portals" role="group" aria-label="Chọn album ảnh">
+          {GALLERY_ALBUMS.map((space, index) => {
+            const SpaceIcon = SPACE_ICONS[space.id];
+            const selected = space.id === activeSpace;
+            return (
+              <button
+                type="button"
+                id={`guest-album-tab-${space.id}`}
+                aria-pressed={selected}
+                key={space.id}
+                className={`space-portal space-portal--${space.id} ${selected ? 'is-selected' : ''}`}
+                onClick={() => setActiveSpace(space.id)}
+              >
+                <span className="space-portal__art"><SpaceGlyph id={space.id} /></span>
+                <span className="space-portal__meta">
+                  <span className="space-portal__index">0{index + 1}</span>
+                  <span className="space-portal__count">Album riêng</span>
+                </span>
+                <span className="space-portal__title">{space.title}</span>
+                <span className="space-portal__subtitle">{space.subtitle}</span>
+                <SpaceIcon className="space-portal__icon" size={18} aria-hidden />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className={`gallery-album gallery-album--${album.style} guest-album-lock`} aria-labelledby={`guest-album-tab-${activeSpace}`}>
+          <div className="gallery-album__cover" aria-hidden>
+            <SpaceGlyph id={activeSpace} />
+            <span>Album riêng</span>
+          </div>
+          <div className="gallery-album__intro">
+            <p className="gallery-album__eyebrow">{album.owner === 'Cả hai' ? 'Album chung' : `Album của ${album.owner}`}</p>
+            <h3>{album.title}</h3>
+            <p className="gallery-album__subtitle">{album.subtitle}</p>
+            <p className="gallery-album__description">{album.description}</p>
+            <div className="gallery-album__actions">
+              <span>Chỉ dành cho thành viên</span>
+              <button type="button" className="photo-button photo-button--quiet" disabled aria-disabled="true">
+                <LockKeyhole size={16} aria-hidden /> Thêm ảnh
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className={`guest-space-locked guest-space-locked--${activeSpace}`}>
+          <span className="guest-space-locked__art" aria-hidden><Icon size={28} /></span>
+          <div>
+            <h3>Album này chỉ dành riêng cho hai thành viên.</h3>
+            <p>Đăng nhập để xem ảnh và những ghi chú trong album.</p>
+          </div>
+          <button type="button" className="photo-button photo-button--primary" onClick={() => onRequestSignIn('spaces')}>
+            <LockKeyhole size={16} aria-hidden /> Đăng nhập để mở khóa
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function AlbumPhoto({ image, index, onOpen }: { image: DisplayPhoto; index: number; onOpen: () => void }) {
   return (
     <figure className="gallery-photo">
@@ -118,13 +192,17 @@ export function JournalSpaces({
     () => new SupabaseSharedJournalRepository(identity),
     [identity]
   );
+  const localRepository = useMemo(
+    () => photoLetterRepositoryFor(identity.userId),
+    [identity.userId]
+  );
 
   const refreshLocalPhotos = useCallback(async () => {
     setLocalLoading(true);
     try {
       const [images, savedAlbums] = await Promise.all([
-        photoLetterRepository.listPhotos(),
-        photoLetterRepository.listAlbums(),
+        localRepository.listPhotos(),
+        localRepository.listAlbums(),
       ]);
       setLocalPhotos(images.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
       setAlbums(savedAlbums);
@@ -135,7 +213,7 @@ export function JournalSpaces({
     } finally {
       setLocalLoading(false);
     }
-  }, []);
+  }, [localRepository]);
 
   const refreshSharedPhotos = useCallback(async () => {
     setSharedLoading(true);
@@ -202,7 +280,7 @@ export function JournalSpaces({
     () => gallery.map((image) => ({
       id: `existing-${image.id}`,
       albumId: imageSpace(image.storage_path),
-      src: image.public_url,
+      src: image.signed_url,
       caption: image.caption || '',
       date: '',
       source: 'existing',
@@ -246,7 +324,7 @@ export function JournalSpaces({
   const diaryImages: DisplayPhoto[] = diary.map((image) => ({
     id: image.id,
     albumId: null,
-    src: image.public_url,
+    src: image.signed_url,
     caption: image.caption || '',
     date: image.date || '',
     source: 'existing',
@@ -281,7 +359,7 @@ export function JournalSpaces({
 
   const updatePhoto = async (image: GalleryImage) => {
     if (image.storagePath) await sharedRepository.updateSharedPhoto(image);
-    else await photoLetterRepository.updatePhoto(image);
+    else await localRepository.updatePhoto(image);
     setActiveSpace(image.albumId);
     await Promise.all([refreshLocalPhotos(), refreshSharedPhotos()]);
     setNotice('Đã lưu thay đổi trong album chung.');
@@ -289,7 +367,7 @@ export function JournalSpaces({
 
   const deletePhoto = async (image: GalleryImage) => {
     if (image.storagePath) await sharedRepository.deleteSharedPhoto(image);
-    else await photoLetterRepository.deletePhoto(image.id);
+    else await localRepository.deletePhoto(image.id);
     await Promise.all([refreshLocalPhotos(), refreshSharedPhotos()]);
     setNotice(image.storagePath ? 'Đã xóa ảnh khỏi album chung.' : 'Đã xóa ảnh trên thiết bị này.');
   };
@@ -299,7 +377,7 @@ export function JournalSpaces({
     await sharedRepository.uploadPhotos([image], image.id);
     let localCopyRemains = false;
     try {
-      await photoLetterRepository.deletePhoto(image.id);
+      await localRepository.deletePhoto(image.id);
     } catch (error) {
       console.error('Ảnh đã chia sẻ nhưng chưa xóa được bản lưu cũ trên thiết bị.', error);
       localCopyRemains = true;

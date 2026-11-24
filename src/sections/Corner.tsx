@@ -22,8 +22,8 @@ export function Corner({
           <p>Ghi chú, việc muốn làm cùng nhau và những lá thư dành riêng cho nhau.</p>
         </div>
         <div className="corner-grid">
-          <Wishlist />
-          <PersonalNotes notes={notes} stories={stories} />
+          <Wishlist userId={identity.userId} />
+          <PersonalNotes notes={notes} stories={stories} userId={identity.userId} />
         </div>
         <Letter identity={identity} />
       </div>

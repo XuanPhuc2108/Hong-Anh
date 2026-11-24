@@ -9,8 +9,8 @@ function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function Wishlist() {
-  const [items, setItems, storageError] = useDeviceValue<WishItem[]>(STORAGE_KEY, []);
+export function Wishlist({ userId }: { userId: string }) {
+  const [items, setItems, storageError] = useDeviceValue<WishItem[]>(`${STORAGE_KEY}:${userId}`, []);
   const [title, setTitle] = useState('');
   const [editing, setEditing] = useState<{ id: string; title: string } | null>(null);
 

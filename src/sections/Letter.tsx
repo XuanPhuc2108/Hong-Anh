@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FilePenLine, Inbox, Mail, MailCheck, Trash2 } from 'lucide-react';
+import { FilePenLine, Inbox, LockKeyhole, Mail, MailCheck, Trash2 } from 'lucide-react';
 import { LetterComposerDialog } from '@/components/LetterComposerDialog';
 import { LetterReaderDialog } from '@/components/LetterReaderDialog';
 import { formatPhotoDate } from '@/lib/imageFiles';
@@ -14,6 +14,38 @@ const TABS: { id: MailboxTab; label: string }[] = [
   { id: 'sent', label: 'Đã gửi' },
   { id: 'drafts', label: 'Bản nháp' },
 ];
+
+export function GuestLetterPreview({ onRequestSignIn }: { onRequestSignIn: (returnTo?: string) => void }) {
+  return (
+    <section id="corner" className="love-mailbox section-anchor guest-letter-preview" aria-labelledby="guest-letter-title">
+      <header className="love-mailbox__intro">
+        <div>
+          <p className="section-kicker">Thư tay</p>
+          <h2 id="guest-letter-title">Những lá thư</h2>
+          <p>Một góc nhỏ để Phúc và Ánh gửi nhau những điều muốn nói.</p>
+        </div>
+        <button type="button" className="photo-button photo-button--quiet" disabled aria-disabled="true">
+          <LockKeyhole size={16} aria-hidden /> Viết thư mới
+        </button>
+      </header>
+
+      <div className="guest-letter-lock">
+        <div className="guest-letter-envelopes" aria-hidden>
+          <span className="guest-letter-envelope guest-letter-envelope--back"><Mail size={24} /></span>
+          <span className="guest-letter-envelope guest-letter-envelope--front"><Mail size={27} /></span>
+          <span className="guest-letter-envelope guest-letter-envelope--small"><Mail size={19} /></span>
+          <span className="guest-letter-lock__seal"><LockKeyhole size={17} /></span>
+        </div>
+        <p className="section-kicker">Hộp thư riêng</p>
+        <h3>Những lá thư này chỉ dành riêng cho Phúc và Ánh.</h3>
+        <p>Đăng nhập để mở hộp thư và đọc thư đã gửi, đã nhận.</p>
+        <button type="button" className="photo-button photo-button--primary" onClick={() => onRequestSignIn('corner')}>
+          <LockKeyhole size={16} aria-hidden /> Đăng nhập để mở khóa
+        </button>
+      </div>
+    </section>
+  );
+}
 
 export function Letter({ identity }: { identity: CoupleIdentity }) {
   const [letters, setLetters] = useState<LoveLetter[]>([]);

@@ -135,6 +135,7 @@ export function createLocalId() {
 
 export class IndexedDbPhotoLetterRepository implements PhotoLetterRepository {
   private databasePromise: Promise<IDBDatabase> | null = null;
+  constructor(private readonly databaseName = DATABASE_NAME) {}
 
   private openDatabase() {
     if (this.databasePromise) return this.databasePromise;
@@ -143,7 +144,7 @@ export class IndexedDbPhotoLetterRepository implements PhotoLetterRepository {
     }
 
     this.databasePromise = new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+      const request = indexedDB.open(this.databaseName, DATABASE_VERSION);
       request.onupgradeneeded = () => {
         const database = request.result;
         if (!database.objectStoreNames.contains(PHOTO_STORE)) {
@@ -326,3 +327,8 @@ export class IndexedDbPhotoLetterRepository implements PhotoLetterRepository {
 }
 
 export const photoLetterRepository: PhotoLetterRepository = new IndexedDbPhotoLetterRepository();
+
+export function photoLetterRepositoryFor(userId: string): PhotoLetterRepository {
+  if (!userId.trim()) throw new Error('Thiếu mã thành viên để mở dữ liệu cục bộ.');
+  return new IndexedDbPhotoLetterRepository(`${DATABASE_NAME}:${userId}`);
+}
