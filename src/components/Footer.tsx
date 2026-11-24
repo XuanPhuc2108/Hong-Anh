@@ -9,8 +9,7 @@ export function Footer() {
           <BrandMark className="site-footer__mark" />
           <span>My Love</span>
         </a>
-        <p>Góc nhỏ cất lại ngày tháng của Phúc &amp; Ánh.</p>
-        <a href="#hero" className="site-footer__top">Lên đầu trang nè <ArrowUpRight size={16} aria-hidden /></a>
+        <a href="#hero" className="site-footer__top">Về đầu trang <ArrowUpRight size={16} aria-hidden /></a>
       </div>
       <span className="site-footer__line" aria-hidden />
     </footer>

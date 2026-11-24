@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { formatPhotoDate } from '@/lib/imageFiles';
 
-export type LightboxItem = { src: string; caption?: string };
+export type LightboxItem = { src: string; caption?: string; date?: string; note?: string; onEdit?: () => void };
 
 type LightboxProps = {
   items: LightboxItem[];
@@ -103,7 +104,7 @@ export function Lightbox({ items, index, onClose, onNavigate }: LightboxProps) {
             onClose();
           }}
           className="lg-dark btn-tactile grid h-11 w-11 place-items-center rounded-full"
-          aria-label="Đóng ảnh nè"
+          aria-label="Đóng ảnh"
         >
           <X size={18} />
         </button>
@@ -141,9 +142,27 @@ export function Lightbox({ items, index, onClose, onNavigate }: LightboxProps) {
       >
         <img
           src={current.src}
-          alt={current.caption ?? ''}
+          alt={current.caption || `Ảnh ${index! + 1} trong album`}
           className="max-h-[76vh] max-w-full rounded-sm object-contain shadow-soft-lg"
         />
+        {(current.caption || current.date || current.note || current.onEdit) && (
+          <figcaption className="flex w-full max-w-3xl flex-wrap items-center justify-between gap-3 text-sm text-white/85">
+            <span className="min-w-0 flex-1 text-center sm:text-left">
+              {current.caption && <span className="block">{current.caption}</span>}
+              {current.date && <time className="mt-1 block text-xs text-white/65" dateTime={current.date}>{formatPhotoDate(current.date)}</time>}
+              {current.note && <span className="mt-1 block text-xs text-white/65">{current.note}</span>}
+            </span>
+            {current.onEdit && (
+              <button
+                type="button"
+                className="lg-dark btn-tactile inline-flex min-h-11 items-center gap-2 rounded-full px-4"
+                onClick={current.onEdit}
+              >
+                <Pencil size={15} aria-hidden /> Chỉnh sửa
+              </button>
+            )}
+          </figcaption>
+        )}
       </figure>
     </div>
   );

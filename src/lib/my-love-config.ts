@@ -24,7 +24,7 @@ export const playlists: {
   {
     id: 'anh',
     title: 'Playlist của Ánh',
-    description: 'Mấy bài Ánh đã gom lại trong playlist nè.',
+    description: 'Những bài hát Ánh đã thêm vào playlist.',
     platform: 'Spotify',
     url: 'https://open.spotify.com/playlist/6GnX4viZ92RH1Ux8E6I02o?si=cC_UUnR6Q1uPW2bRILOYCg&utm_source=copy-link&pi=TYy5qA92T5qoV&pt=b54eddcf43cc5d8e1b3360a586718626',
     artwork: 'https://mosaic.scdn.co/300/ab67616d00001e024992bf290fe8c9f82a0e66e4ab67616d00001e0276c10c0497647b0cee2dba35ab67616d00001e02819219f4ea0ad1e11cb78411ab67616d00001e02fb24fcf5cd43a2bbc3dfa99f',
@@ -50,7 +50,7 @@ export const playlists: {
   {
     id: 'phuc',
     title: 'Playlist của Phúc',
-    description: 'Mấy bài Phúc đã gom lại trong playlist nè.',
+    description: 'Những bài hát Phúc đã thêm vào playlist.',
     platform: 'YouTube',
     url: 'https://www.youtube.com/playlist?list=PLZEhMIjJAUlc',
     artwork: 'https://i.ytimg.com/vi/RgKAFK5djSk/hqdefault.jpg',

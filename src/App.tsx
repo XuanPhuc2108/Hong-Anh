@@ -13,6 +13,8 @@ import { JournalSpaces } from '@/sections/JournalSpaces';
 import { OurSoundtrack } from '@/sections/OurSoundtrack';
 import { Corner } from '@/sections/Corner';
 import { TodayTogether } from '@/sections/TodayTogether';
+import { CoupleAuthGate } from '@/components/CoupleAuthGate';
+import type { CoupleIdentity } from '@/lib/photoLetterRepository';
 
 type Phase = 'opening' | 'loading' | 'error' | 'site';
 
@@ -38,14 +40,16 @@ async function preloadThumbnails(sources: string[]) {
   );
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? `Mình mở chưa được: ${error.message}` : 'Có chút trục trặc khi mở cuốn sổ nè.';
-}
-
-function AppContent() {
+function AppContent({
+  identity,
+  onSignOut,
+}: {
+  identity: CoupleIdentity;
+  onSignOut: () => Promise<void>;
+}) {
   const [phase, setPhase] = useState<Phase>('opening');
   const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState('Sẵn sàng mở cuốn sổ nè.');
+  const [status, setStatus] = useState('Sẵn sàng mở nhật ký.');
   const [error, setError] = useState('');
   const [data, setData] = useState<JournalData>(emptyJournalData);
   const { primeAudio, playSound } = useSound();
@@ -54,20 +58,20 @@ function AppContent() {
     setPhase('loading');
     setError('');
     setProgress(8);
-    setStatus('Đang chuẩn bị một chút xíu');
+    setStatus('Đang tải nhật ký.');
     try {
       if (document.fonts?.ready) await document.fonts.ready;
       setProgress(24);
-      setStatus('Đang sửa soạn từng trang');
+      setStatus('Đang tải kiểu chữ.');
 
       await preloadImage('/my-love-cover.svg');
       setProgress(44);
-      setStatus('Đang mở chiếc bìa');
+      setStatus('Đang tải ảnh bìa.');
 
       const journal = await loadJournalData();
       setData(journal);
       setProgress(72);
-      setStatus(journal.connected ? 'Đang xếp kỷ niệm vào sổ' : 'Đang xếp những trang đầu');
+      setStatus('Đang tải kỷ niệm.');
 
       const thumbnails = [
         ...journal.gallery.slice(0, 3).map((image) => image.public_url),
@@ -75,12 +79,13 @@ function AppContent() {
       ];
       await preloadThumbnails(thumbnails);
       setProgress(100);
-      setStatus('Cuốn sổ sẵn sàng rồi nè');
+      setStatus('Đã tải xong nhật ký.');
       await new Promise<void>((resolve) => window.setTimeout(resolve, 220));
       setPhase('site');
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
-      setStatus('Chưa mở được cuốn sổ');
+      console.error('Không thể tải dữ liệu My Love.', loadError);
+      setError('Không thể tải nhật ký. Hãy thử lại.');
+      setStatus('Không thể mở nhật ký.');
       setPhase('error');
     }
   }, []);
@@ -140,19 +145,19 @@ function AppContent() {
     <div className="my-love-app" data-connected={data.connected}>
       <a href="#main" className="skip-link">Bỏ qua đến nội dung chính</a>
       <AmbientLight />
-      <FloatingNav />
+      <FloatingNav identity={identity} onSignOut={onSignOut} />
       <main id="main" tabIndex={-1} className="site-content">
         <Hero />
-        <TodayTogether memories={data.memories} gallery={data.gallery} diary={data.diary} />
+        <TodayTogether />
         <RelationshipCounter />
         <JournalMoment />
         <OurStory memories={data.memories} />
-        <JournalSpaces gallery={data.gallery} diary={data.diary} memories={data.memories} notes={data.notes} />
+        <JournalSpaces identity={identity} gallery={data.gallery} diary={data.diary} memories={data.memories} notes={data.notes} />
         <OurSoundtrack />
-        <Corner notes={data.notes} stories={data.stories} settings={data.settings} />
+        <Corner identity={identity} notes={data.notes} stories={data.stories} />
         {!data.connected && (
           <p className="connection-note" role="status">
-            Chưa kết nối được kho kỷ niệm trong môi trường này. Bạn thử tải lại nha.
+            Không kết nối được với kho kỷ niệm. Tải lại trang để thử lại.
           </p>
         )}
       </main>
@@ -162,5 +167,9 @@ function AppContent() {
 }
 
 export default function App() {
-  return <AppContent />;
+  return (
+    <CoupleAuthGate>
+      {(identity, onSignOut) => <AppContent identity={identity} onSignOut={onSignOut} />}
+    </CoupleAuthGate>
+  );
 }

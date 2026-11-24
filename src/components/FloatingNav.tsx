@@ -4,6 +4,7 @@ import { BrandMark } from '@/components/BrandMark';
 import { SoundControls } from '@/components/SoundControls';
 import { useSound } from '@/components/SoundContext';
 import { useActiveSection, useGlassPointer } from '@/lib/hooks';
+import type { CoupleIdentity } from '@/lib/photoLetterRepository';
 
 const SECTIONS = [
   { id: 'hero', label: 'Trang đầu' },
@@ -15,8 +16,15 @@ const SECTIONS = [
 ];
 const SECTION_IDS = SECTIONS.map((section) => section.id);
 
-export function FloatingNav() {
+export function FloatingNav({
+  identity,
+  onSignOut,
+}: {
+  identity: CoupleIdentity;
+  onSignOut: () => Promise<void>;
+}) {
   const [open, setOpen] = useState(false);
+  const [accountError, setAccountError] = useState('');
   const active = useActiveSection(SECTION_IDS);
   const glassRef = useGlassPointer<HTMLDivElement>();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -56,6 +64,13 @@ export function FloatingNav() {
   };
   const toggleSound = () => {
     updatePreferences({ enabled: !preferences.enabled });
+  };
+  const signOut = () => {
+    setAccountError('');
+    void onSignOut().catch((error: unknown) => {
+      console.error('Không đăng xuất được.', error);
+      setAccountError('Chưa đăng xuất được. Hãy thử lại.');
+    });
   };
 
   return (
@@ -99,7 +114,7 @@ export function FloatingNav() {
         </div>
         <div id="my-love-menu" ref={panelRef} className={`site-nav__panel ${open ? 'is-open' : ''}`}>
           <div className="site-nav__panel-inner lg">
-            <p className="site-nav__panel-title">Mình ghé góc nào nè?</p>
+            <p className="site-nav__panel-title">Chọn một mục</p>
             <nav className="site-nav__panel-links" aria-label="Các phần trong My Love">
               {SECTIONS.map((section, index) => (
                 <a key={section.id} href={`#${section.id}`} onClick={closeAfterNavigation}>
@@ -109,6 +124,13 @@ export function FloatingNav() {
               ))}
             </nav>
             <SoundControls />
+            <div className="site-nav__account">
+              <span>Đang đăng nhập: {identity.name}</span>
+              <button type="button" className="photo-button photo-button--quiet" onClick={signOut}>
+                Đăng xuất
+              </button>
+              {accountError && <p role="alert">{accountError}</p>}
+            </div>
           </div>
         </div>
       </header>

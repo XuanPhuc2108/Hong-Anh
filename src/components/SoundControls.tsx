@@ -36,7 +36,7 @@ export function SoundControls() {
         />
       </label>
       <p className="sound-caption" aria-live="polite">
-        {persistenceError || 'Không có nhạc tự phát đâu nha.'}
+        {persistenceError || 'Âm thanh giao diện chỉ phát khi bạn bật.'}
       </p>
     </fieldset>
   );
