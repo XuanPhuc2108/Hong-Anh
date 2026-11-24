@@ -9,10 +9,13 @@ import { Hero } from '@/sections/Hero';
 import { RelationshipCounter } from '@/sections/RelationshipCounter';
 import { JournalMoment } from '@/sections/JournalMoment';
 import { OurStory } from '@/sections/OurStory';
-import { JournalSpaces } from '@/sections/JournalSpaces';
+import { GuestJournalSpaces, JournalSpaces } from '@/sections/JournalSpaces';
 import { OurSoundtrack } from '@/sections/OurSoundtrack';
 import { Corner } from '@/sections/Corner';
 import { TodayTogether } from '@/sections/TodayTogether';
+import { CoupleAuthGate, type CoupleAccess } from '@/components/CoupleAuthGate';
+import type { CoupleIdentity } from '@/lib/photoLetterRepository';
+import { GuestLetterPreview } from '@/sections/Letter';
 
 type Phase = 'opening' | 'loading' | 'error' | 'site';
 
@@ -38,14 +41,18 @@ async function preloadThumbnails(sources: string[]) {
   );
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? `Mình mở chưa được: ${error.message}` : 'Có chút trục trặc khi mở cuốn sổ nè.';
-}
-
-function AppContent() {
+function AppContent({
+  identity,
+  initialSection,
+  onSignOut,
+}: {
+  identity: CoupleIdentity;
+  initialSection: string | null;
+  onSignOut: () => Promise<void>;
+}) {
   const [phase, setPhase] = useState<Phase>('opening');
   const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState('Sẵn sàng mở cuốn sổ nè.');
+  const [status, setStatus] = useState('Sẵn sàng mở nhật ký.');
   const [error, setError] = useState('');
   const [data, setData] = useState<JournalData>(emptyJournalData);
   const { primeAudio, playSound } = useSound();
@@ -54,33 +61,34 @@ function AppContent() {
     setPhase('loading');
     setError('');
     setProgress(8);
-    setStatus('Đang chuẩn bị một chút xíu');
+    setStatus('Đang tải nhật ký.');
     try {
       if (document.fonts?.ready) await document.fonts.ready;
       setProgress(24);
-      setStatus('Đang sửa soạn từng trang');
+      setStatus('Đang tải kiểu chữ.');
 
       await preloadImage('/my-love-cover.svg');
       setProgress(44);
-      setStatus('Đang mở chiếc bìa');
+      setStatus('Đang tải ảnh bìa.');
 
       const journal = await loadJournalData();
       setData(journal);
       setProgress(72);
-      setStatus(journal.connected ? 'Đang xếp kỷ niệm vào sổ' : 'Đang xếp những trang đầu');
+      setStatus('Đang tải kỷ niệm.');
 
       const thumbnails = [
-        ...journal.gallery.slice(0, 3).map((image) => image.public_url),
-        ...journal.diary.slice(0, 1).map((image) => image.public_url),
+        ...journal.gallery.slice(0, 3).map((image) => image.signed_url),
+        ...journal.diary.slice(0, 1).map((image) => image.signed_url),
       ];
       await preloadThumbnails(thumbnails);
       setProgress(100);
-      setStatus('Cuốn sổ sẵn sàng rồi nè');
+      setStatus('Đã tải xong nhật ký.');
       await new Promise<void>((resolve) => window.setTimeout(resolve, 220));
       setPhase('site');
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
-      setStatus('Chưa mở được cuốn sổ');
+      console.error('Không thể tải dữ liệu My Love.', loadError);
+      setError('Không thể tải nhật ký. Hãy thử lại.');
+      setStatus('Không thể mở nhật ký.');
       setPhase('error');
     }
   }, []);
@@ -101,6 +109,13 @@ function AppContent() {
       window.setTimeout(() => root.classList.add('m-enter-done'), 700);
     });
   }, [phase]);
+
+  useEffect(() => {
+    if (phase !== 'site' || !initialSection) return;
+    requestAnimationFrame(() => {
+      document.getElementById(initialSection)?.scrollIntoView({ block: 'start' });
+    });
+  }, [phase, initialSection]);
 
   useEffect(() => {
     if (phase !== 'site') return;
@@ -140,19 +155,19 @@ function AppContent() {
     <div className="my-love-app" data-connected={data.connected}>
       <a href="#main" className="skip-link">Bỏ qua đến nội dung chính</a>
       <AmbientLight />
-      <FloatingNav />
+      <FloatingNav identity={identity} onSignOut={onSignOut} />
       <main id="main" tabIndex={-1} className="site-content">
         <Hero />
-        <TodayTogether memories={data.memories} gallery={data.gallery} diary={data.diary} />
+        <TodayTogether userId={identity.userId} />
         <RelationshipCounter />
         <JournalMoment />
         <OurStory memories={data.memories} />
-        <JournalSpaces gallery={data.gallery} diary={data.diary} memories={data.memories} notes={data.notes} />
+        <JournalSpaces identity={identity} gallery={data.gallery} diary={data.diary} memories={data.memories} notes={data.notes} />
         <OurSoundtrack />
-        <Corner notes={data.notes} stories={data.stories} settings={data.settings} />
+        <Corner identity={identity} notes={data.notes} stories={data.stories} />
         {!data.connected && (
           <p className="connection-note" role="status">
-            Chưa kết nối được kho kỷ niệm trong môi trường này. Bạn thử tải lại nha.
+            Không kết nối được với kho kỷ niệm. Tải lại trang để thử lại.
           </p>
         )}
       </main>
@@ -161,6 +176,35 @@ function AppContent() {
   );
 }
 
+function GuestContent({ onRequestSignIn }: Extract<CoupleAccess, { mode: 'guest' }>) {
+  return (
+    <div className="my-love-app" data-connected="false" data-access="guest">
+      <a href="#main" className="skip-link">Bỏ qua đến nội dung chính</a>
+      <AmbientLight />
+      <FloatingNav mode="guest" onRequestSignIn={onRequestSignIn} />
+      <main id="main" tabIndex={-1} className="site-content">
+        <Hero mode="guest" />
+        <GuestJournalSpaces onRequestSignIn={onRequestSignIn} />
+        <GuestLetterPreview onRequestSignIn={onRequestSignIn} />
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
 export default function App() {
-  return <AppContent />;
+  return (
+    <CoupleAuthGate>
+      {(access) => access.mode === 'guest'
+        ? <GuestContent {...access} />
+        : (
+          <AppContent
+            key={access.identity.userId}
+            identity={access.identity}
+            initialSection={access.initialSection}
+            onSignOut={access.onSignOut}
+          />
+        )}
+    </CoupleAuthGate>
+  );
 }

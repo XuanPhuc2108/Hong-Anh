@@ -1,63 +1,41 @@
-import { useMemo, useRef, useState } from 'react';
-import { Flower2, Heart, Images, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Flower2, Heart, Images, LockKeyhole, Plus, Sparkles } from 'lucide-react';
 import { Lightbox, type LightboxItem } from '@/components/Lightbox';
-import { RefractiveImageLens } from '@/components/RefractiveImageLens';
+import { PhotoDetailDialog } from '@/components/PhotoDetailDialog';
+import { PhotoUploadDialog } from '@/components/PhotoUploadDialog';
+import { formatPhotoDate } from '@/lib/imageFiles';
+import {
+  GALLERY_ALBUMS,
+  photoLetterRepositoryFor,
+  type CoupleIdentity,
+  type GalleryAlbum,
+  type GalleryAlbumId,
+  type GalleryImage,
+  type SharedJournalRepository,
+} from '@/lib/photoLetterRepository';
+import { SupabaseSharedJournalRepository } from '@/lib/sharedJournalRepository';
+import { supabase } from '@/lib/supabase';
 import type { DiaryRecord, GalleryRecord, MemoryRecord, NoteRecord } from '@/lib/journalData';
 import { imageSpace } from '@/lib/journalData';
 
-const SPACES = [
-  { id: 'together', title: 'Tụi mình', subtitle: 'Ảnh chụp chung', icon: Heart },
-  { id: 'phuc', title: 'Góc Phúc', subtitle: 'Ảnh của Phúc', icon: Images },
-  { id: 'anh', title: 'Góc Ánh', subtitle: 'Ảnh của Ánh', icon: Flower2 },
-] as const;
+const SPACE_ICONS = { together: Heart, phuc: Images, anh: Flower2 };
 
-type SpaceId = (typeof SPACES)[number]['id'];
-type LightboxScope = 'space' | 'unclassified' | 'diary';
+type DisplayPhoto = {
+  id: string;
+  albumId: GalleryAlbumId | null;
+  src: string;
+  caption: string;
+  date: string;
+  source: 'local' | 'existing' | 'shared';
+  note?: string;
+  local?: GalleryImage;
+  shared?: GalleryImage;
+};
+
+type LightboxScope = 'album' | 'unclassified' | 'diary';
 type LightboxSelection = { scope: LightboxScope; index: number } | null;
 
-function PhotoTile({
-  image,
-  index,
-  spaceTitle,
-  onOpen,
-}: {
-  image: GalleryRecord | DiaryRecord;
-  index: number;
-  spaceTitle: string;
-  onOpen: () => void;
-}) {
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
-  const caption = image.caption?.trim();
-  const size = 'span' in image ? image.span : String(index % 5);
-  return (
-    <figure className={`space-photo space-photo--${size}`}>
-      <button ref={buttonRef} type="button" className="space-photo__button photo-hover" onClick={onOpen} aria-label={`Mở ảnh ${index + 1} trong ${spaceTitle}`}>
-        <img
-          ref={imageRef}
-          src={image.public_url}
-          alt={caption || `Ảnh ${index + 1} trong ${spaceTitle}`}
-          loading="lazy"
-          decoding="async"
-          width="1200"
-          height="900"
-        />
-        {index === 0 && (
-          <RefractiveImageLens
-            stageRef={buttonRef}
-            imageRef={imageRef}
-            src={image.public_url}
-            className="space-photo__lens"
-            radius={18}
-            refraction={20}
-          />
-        )}
-      </button>
-    </figure>
-  );
-}
-
-function SpaceGlyph({ id }: { id: SpaceId }) {
+function SpaceGlyph({ id }: { id: GalleryAlbumId }) {
   if (id === 'together') {
     return (
       <svg viewBox="0 0 220 140" aria-hidden>
@@ -88,45 +66,331 @@ function SpaceGlyph({ id }: { id: SpaceId }) {
   );
 }
 
+export function GuestJournalSpaces({ onRequestSignIn }: { onRequestSignIn: (returnTo?: string) => void }) {
+  const [activeSpace, setActiveSpace] = useState<GalleryAlbumId>('together');
+  const album = GALLERY_ALBUMS.find((item) => item.id === activeSpace) ?? GALLERY_ALBUMS[0];
+  const Icon = SPACE_ICONS[activeSpace];
+
+  return (
+    <section className="spaces-section section-anchor guest-spaces" id="spaces" aria-labelledby="guest-spaces-title">
+      <div className="spaces-wrap">
+        <div className="section-lead section-lead--wide">
+          <span className="section-kicker">Kho ảnh</span>
+          <h2 id="guest-spaces-title">Ba không gian ảnh</h2>
+          <p>Ba cuốn album riêng, mỗi cuốn lưu một phần câu chuyện của Phúc và Ánh.</p>
+        </div>
+
+        <div className="space-portals" role="group" aria-label="Chọn album ảnh">
+          {GALLERY_ALBUMS.map((space, index) => {
+            const SpaceIcon = SPACE_ICONS[space.id];
+            const selected = space.id === activeSpace;
+            return (
+              <button
+                type="button"
+                id={`guest-album-tab-${space.id}`}
+                aria-pressed={selected}
+                key={space.id}
+                className={`space-portal space-portal--${space.id} ${selected ? 'is-selected' : ''}`}
+                onClick={() => setActiveSpace(space.id)}
+              >
+                <span className="space-portal__art"><SpaceGlyph id={space.id} /></span>
+                <span className="space-portal__meta">
+                  <span className="space-portal__index">0{index + 1}</span>
+                  <span className="space-portal__count">Album riêng</span>
+                </span>
+                <span className="space-portal__title">{space.title}</span>
+                <span className="space-portal__subtitle">{space.subtitle}</span>
+                <SpaceIcon className="space-portal__icon" size={18} aria-hidden />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className={`gallery-album gallery-album--${album.style} guest-album-lock`} aria-labelledby={`guest-album-tab-${activeSpace}`}>
+          <div className="gallery-album__cover" aria-hidden>
+            <SpaceGlyph id={activeSpace} />
+            <span>Album riêng</span>
+          </div>
+          <div className="gallery-album__intro">
+            <p className="gallery-album__eyebrow">{album.owner === 'Cả hai' ? 'Album chung' : `Album của ${album.owner}`}</p>
+            <h3>{album.title}</h3>
+            <p className="gallery-album__subtitle">{album.subtitle}</p>
+            <p className="gallery-album__description">{album.description}</p>
+            <div className="gallery-album__actions">
+              <span>Chỉ dành cho thành viên</span>
+              <button type="button" className="photo-button photo-button--quiet" disabled aria-disabled="true">
+                <LockKeyhole size={16} aria-hidden /> Thêm ảnh
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className={`guest-space-locked guest-space-locked--${activeSpace}`}>
+          <span className="guest-space-locked__art" aria-hidden><Icon size={28} /></span>
+          <div>
+            <h3>Album này chỉ dành riêng cho hai thành viên.</h3>
+            <p>Đăng nhập để xem ảnh và những ghi chú trong album.</p>
+          </div>
+          <button type="button" className="photo-button photo-button--primary" onClick={() => onRequestSignIn('spaces')}>
+            <LockKeyhole size={16} aria-hidden /> Đăng nhập để mở khóa
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AlbumPhoto({ image, index, onOpen }: { image: DisplayPhoto; index: number; onOpen: () => void }) {
+  return (
+    <figure className="gallery-photo">
+      <button type="button" className="gallery-photo__open" onClick={onOpen} aria-label={`Xem ảnh ${image.caption || index + 1}`}>
+        <img src={image.src} alt={image.caption || `Ảnh ${index + 1} trong album`} loading="lazy" decoding="async" />
+        <span className="gallery-photo__local">
+          {image.source === 'local' ? 'Trên thiết bị này' : image.source === 'shared' ? 'Album chung' : 'Ảnh hiện có'}
+        </span>
+      </button>
+      {(image.caption || image.date) && (
+        <figcaption className="gallery-photo__caption">
+          {image.caption && <span>{image.caption}</span>}
+          {image.date && <time dateTime={image.date}>{formatPhotoDate(image.date)}</time>}
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
 export function JournalSpaces({
+  identity,
   gallery,
   diary,
   memories,
   notes,
   localNoteCount = 0,
 }: {
+  identity: CoupleIdentity;
   gallery: GalleryRecord[];
   diary: DiaryRecord[];
   memories: MemoryRecord[];
   notes: NoteRecord[];
   localNoteCount?: number;
 }) {
-  const [activeSpace, setActiveSpace] = useState<SpaceId>('together');
+  const [activeSpace, setActiveSpace] = useState<GalleryAlbumId>('together');
+  const [albums, setAlbums] = useState<GalleryAlbum[]>(GALLERY_ALBUMS);
+  const [localPhotos, setLocalPhotos] = useState<GalleryImage[]>([]);
+  const [sharedPhotos, setSharedPhotos] = useState<GalleryImage[]>([]);
+  const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
+  const [localError, setLocalError] = useState('');
+  const [sharedError, setSharedError] = useState('');
+  const [realtimeError, setRealtimeError] = useState('');
+  const [localLoading, setLocalLoading] = useState(true);
+  const [sharedLoading, setSharedLoading] = useState(true);
   const [lightbox, setLightbox] = useState<LightboxSelection>(null);
-  const grouped = useMemo(
-    () => ({
-      together: gallery.filter((image) => imageSpace(image.storage_path) === 'together'),
-      phuc: gallery.filter((image) => imageSpace(image.storage_path) === 'phuc'),
-      anh: gallery.filter((image) => imageSpace(image.storage_path) === 'anh'),
-      unclassified: gallery.filter((image) => imageSpace(image.storage_path) === null),
+  const [showUploader, setShowUploader] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState<GalleryImage | null>(null);
+  const [notice, setNotice] = useState('');
+  const sharedRepository = useMemo<SharedJournalRepository>(
+    () => new SupabaseSharedJournalRepository(identity),
+    [identity]
+  );
+  const localRepository = useMemo(
+    () => photoLetterRepositoryFor(identity.userId),
+    [identity.userId]
+  );
+
+  const refreshLocalPhotos = useCallback(async () => {
+    setLocalLoading(true);
+    try {
+      const [images, savedAlbums] = await Promise.all([
+        localRepository.listPhotos(),
+        localRepository.listAlbums(),
+      ]);
+      setLocalPhotos(images.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      setAlbums(savedAlbums);
+      setLocalError('');
+    } catch (error) {
+      console.error('Không đọc được ảnh đã lưu trên thiết bị.', error);
+      setLocalError('Chưa đọc được album trên thiết bị này. Tải lại trang để thử lại.');
+    } finally {
+      setLocalLoading(false);
+    }
+  }, [localRepository]);
+
+  const refreshSharedPhotos = useCallback(async () => {
+    setSharedLoading(true);
+    try {
+      setSharedPhotos(await sharedRepository.listSharedPhotos());
+      setSharedError('');
+    } catch (error) {
+      console.error('Không tải được album chung.', error);
+      setSharedError('Chưa tải được album chung. Kiểm tra kết nối rồi thử lại.');
+    } finally {
+      setSharedLoading(false);
+    }
+  }, [sharedRepository]);
+
+  useEffect(() => {
+    void refreshLocalPhotos();
+  }, [refreshLocalPhotos]);
+
+  useEffect(() => {
+    void refreshSharedPhotos();
+    const channel = supabase
+      .channel(`couple-gallery-${identity.userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'couple_gallery_images' }, () => {
+        void refreshSharedPhotos();
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setRealtimeError('');
+          void refreshSharedPhotos();
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setRealtimeError('Cập nhật trực tiếp đang tạm ngắt. Tải lại album để xem thay đổi mới nhất.');
+        }
+      });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [identity.userId, refreshSharedPhotos]);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshSharedPhotos();
+    };
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => document.removeEventListener('visibilitychange', refreshWhenVisible);
+  }, [refreshSharedPhotos]);
+
+  useEffect(() => {
+    const urls = new Map(localPhotos.flatMap((image) => (
+      image.blob ? [[image.id, URL.createObjectURL(image.blob)] as const] : []
+    )));
+    setPhotoUrls(urls);
+    return () => urls.forEach((url) => URL.revokeObjectURL(url));
+  }, [localPhotos]);
+
+  const localDisplay = useMemo<DisplayPhoto[]>(
+    () => localPhotos.flatMap((image) => {
+      const src = photoUrls.get(image.id);
+      return src ? [{ id: image.id, albumId: image.albumId, src, caption: image.caption, date: image.date, source: 'local' as const, local: image }] : [];
     }),
+    [localPhotos, photoUrls]
+  );
+  const remoteDisplay = useMemo<DisplayPhoto[]>(
+    () => gallery.map((image) => ({
+      id: `existing-${image.id}`,
+      albumId: imageSpace(image.storage_path),
+      src: image.signed_url,
+      caption: image.caption || '',
+      date: '',
+      source: 'existing',
+      note: 'Ảnh hiện có chỉ xem được; chỉnh sửa và xóa cần kết nối lưu trữ.',
+    })),
     [gallery]
   );
-  const active = SPACES.find((space) => space.id === activeSpace) ?? SPACES[0];
+  const sharedDisplay = useMemo<DisplayPhoto[]>(
+    () => sharedPhotos.flatMap((image) => image.signedUrl ? [{
+      id: `shared-${image.id}`,
+      albumId: image.albumId,
+      src: image.signedUrl,
+      caption: image.caption,
+      date: image.date,
+      source: 'shared' as const,
+      note: image.note,
+      shared: image,
+    }] : []),
+    [sharedPhotos]
+  );
+  const grouped = useMemo(() => {
+    const albumsById: Record<GalleryAlbumId, DisplayPhoto[]> = { together: [], phuc: [], anh: [] };
+    for (const image of [...localDisplay, ...sharedDisplay, ...remoteDisplay]) {
+      if (image.albumId) albumsById[image.albumId].push(image);
+    }
+    return {
+      together: albumsById.together,
+      phuc: albumsById.phuc,
+      anh: albumsById.anh,
+      unclassified: remoteDisplay.filter((image) => image.albumId === null),
+    };
+  }, [localDisplay, remoteDisplay, sharedDisplay]);
+
+  const selectedAlbum = albums.find((item) => item.id === activeSpace) ?? GALLERY_ALBUMS[0];
+  const sharedCover = sharedPhotos.find((image) => image.albumId === activeSpace && image.isCover);
+  const album = sharedCover
+    ? { ...selectedAlbum, coverPhotoId: `shared-${sharedCover.id}` }
+    : selectedAlbum;
   const activeImages = grouped[activeSpace];
-  const activeLightbox: LightboxItem[] = activeImages.map((image) => ({
-    src: image.public_url,
-    caption: image.caption || undefined,
+  const albumCover = activeImages.find((image) => image.id === album.coverPhotoId) ?? activeImages[0];
+  const diaryImages: DisplayPhoto[] = diary.map((image) => ({
+    id: image.id,
+    albumId: null,
+    src: image.signed_url,
+    caption: image.caption || '',
+    date: image.date || '',
+    source: 'existing',
   }));
-  const unclassifiedLightbox: LightboxItem[] = grouped.unclassified.map((image) => ({
-    src: image.public_url,
+  const groupedUnclassified = grouped.unclassified;
+
+  const lightboxItems = (images: DisplayPhoto[]): LightboxItem[] => images.map((image) => ({
+    src: image.src,
     caption: image.caption || undefined,
+    date: image.date || undefined,
+    note: image.note,
+    ...(image.local || image.shared?.ownerId === identity.userId ? { onEdit: () => {
+      setLightbox(null);
+      setEditingPhoto(image.local ?? image.shared ?? null);
+    } } : {}),
   }));
-  const diaryLightbox: LightboxItem[] = diary.map((image) => ({
-    src: image.public_url,
-    caption: image.caption || undefined,
-  }));
-  const highlight = gallery[0] ?? diary[0];
+
+  const albumItems = lightboxItems(activeImages);
+  const unclassifiedItems = lightboxItems(groupedUnclassified);
+  const diaryItems = lightboxItems(diaryImages);
+
+  const handleUpload = async (images: GalleryImage[], coverPhotoId: string) => {
+    await sharedRepository.uploadPhotos(images, coverPhotoId);
+  };
+
+  const handleUploaded = async (albumId: GalleryAlbumId, count: number) => {
+    setActiveSpace(albumId);
+    await refreshSharedPhotos();
+    const target = GALLERY_ALBUMS.find((item) => item.id === albumId);
+    setNotice(`Đã thêm ${count} ảnh vào album ${target?.title ?? 'đã chọn'} chung.`);
+  };
+
+  const updatePhoto = async (image: GalleryImage) => {
+    if (image.storagePath) await sharedRepository.updateSharedPhoto(image);
+    else await localRepository.updatePhoto(image);
+    setActiveSpace(image.albumId);
+    await Promise.all([refreshLocalPhotos(), refreshSharedPhotos()]);
+    setNotice('Đã lưu thay đổi trong album chung.');
+  };
+
+  const deletePhoto = async (image: GalleryImage) => {
+    if (image.storagePath) await sharedRepository.deleteSharedPhoto(image);
+    else await localRepository.deletePhoto(image.id);
+    await Promise.all([refreshLocalPhotos(), refreshSharedPhotos()]);
+    setNotice(image.storagePath ? 'Đã xóa ảnh khỏi album chung.' : 'Đã xóa ảnh trên thiết bị này.');
+  };
+
+  const shareLocalPhoto = async (image: GalleryImage) => {
+    if (!window.confirm(`Chuyển “${image.fileName}” vào album riêng chung? Người còn lại sẽ xem được ảnh này.`)) return false;
+    await sharedRepository.uploadPhotos([image], image.id);
+    let localCopyRemains = false;
+    try {
+      await localRepository.deletePhoto(image.id);
+    } catch (error) {
+      console.error('Ảnh đã chia sẻ nhưng chưa xóa được bản lưu cũ trên thiết bị.', error);
+      localCopyRemains = true;
+    }
+    await Promise.all([refreshLocalPhotos(), refreshSharedPhotos()]);
+    setNotice(localCopyRemains
+      ? 'Ảnh đã được chia sẻ. Bản cũ vẫn còn lưu trên thiết bị này.'
+      : 'Đã chuyển ảnh vào album chung.');
+    return true;
+  };
+
+  const loading = localLoading || sharedLoading;
+
   const knownTitles = ['ngày bắt đầu trò chuyện', 'chính thức bên nhau'];
   const savedMemoryCount =
     memories.length +
@@ -142,34 +406,36 @@ export function JournalSpaces({
   ].filter((stat) => stat.value > 0);
 
   return (
-    <section id="spaces" aria-labelledby="spaces-title" className="spaces-section section-anchor">
+    <section className="spaces-section section-anchor" id="spaces" aria-labelledby="spaces-title">
       <div className="spaces-wrap">
         <div className="section-lead section-lead--wide">
           <span className="section-kicker">Kho ảnh</span>
-          <h2 id="spaces-title">Ba góc ảnh xinh xinh</h2>
-          <p>Ảnh được xếp theo từng góc nè. Ảnh chưa phân loại sẽ nằm riêng.</p>
+          <h2 id="spaces-title">Ba không gian ảnh</h2>
+          <p>Mỗi album giữ một phần câu chuyện riêng. Chọn album để xem hoặc thêm ảnh.</p>
         </div>
 
-        <div className="space-portals" aria-label="Chọn không gian ảnh">
-          {SPACES.map((space, index) => {
-            const Icon = space.icon;
+        <div className="space-portals" role="group" aria-label="Chọn album ảnh">
+          {GALLERY_ALBUMS.map((space, index) => {
+            const Icon = SPACE_ICONS[space.id];
             const selected = space.id === activeSpace;
             const count = grouped[space.id].length;
             return (
               <button
                 type="button"
+                id={`album-tab-${space.id}`}
+                aria-pressed={selected}
                 key={space.id}
                 className={`space-portal space-portal--${space.id} ${selected ? 'is-selected' : ''}`}
                 onClick={() => {
                   setActiveSpace(space.id);
                   setLightbox(null);
+                  setNotice('');
                 }}
-                aria-pressed={selected}
               >
                 <span className="space-portal__art"><SpaceGlyph id={space.id} /></span>
                 <span className="space-portal__meta">
                   <span className="space-portal__index">0{index + 1}</span>
-                  {count > 0 &&                   <span className="space-portal__count">{count} ảnh</span>}
+                  <span className="space-portal__count">{count} ảnh</span>
                 </span>
                 <span className="space-portal__title">{space.title}</span>
                 <span className="space-portal__subtitle">{space.subtitle}</span>
@@ -179,124 +445,155 @@ export function JournalSpaces({
           })}
         </div>
 
-        <div className={`space-gallery space-gallery--${activeSpace}`}>
-          <div className="space-gallery__heading">
-            <div>
-              <h3>{active.title}</h3>
-              <p>{activeImages.length > 0 ? `${activeImages.length} ảnh trong góc này` : 'Góc này đang chờ ảnh đầu tiên nè.'}</p>
-            </div>
-            <Sparkles size={20} aria-hidden />
+        <div
+          className={`gallery-album gallery-album--${album.style}`}
+          id="album-panel"
+          aria-labelledby={`album-tab-${activeSpace}`}
+        >
+          <div className="gallery-album__cover">
+            {albumCover
+              ? <img src={albumCover.src} alt={albumCover.caption || `Ảnh bìa album ${album.title}`} />
+              : <SpaceGlyph id={activeSpace} />}
+            <span>Ảnh bìa</span>
           </div>
+          <div className="gallery-album__intro">
+            <p className="gallery-album__eyebrow">{album.owner === 'Cả hai' ? 'Album chung' : `Album của ${album.owner}`}</p>
+            <h3>{album.title}</h3>
+            <p className="gallery-album__subtitle">{album.subtitle}</p>
+            <p className="gallery-album__description">{album.description}</p>
+            <div className="gallery-album__actions">
+              <span>{activeImages.length} ảnh</span>
+              <button type="button" className="photo-button photo-button--primary" onClick={() => setShowUploader(true)}>
+                <Plus size={17} aria-hidden /> Thêm ảnh
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {notice && <p className="gallery-notice" role="status">{notice}</p>}
+        {localError && (
+          <div className="gallery-storage-error" role="alert">
+            <p>{localError}</p>
+            <button type="button" className="photo-button photo-button--quiet" onClick={() => void refreshLocalPhotos()}>Thử tải lại</button>
+          </div>
+        )}
+        {sharedError && (
+          <div className="gallery-storage-error" role="alert">
+            <p>{sharedError}</p>
+            <button type="button" className="photo-button photo-button--quiet" onClick={() => void refreshSharedPhotos()}>Thử tải lại</button>
+          </div>
+        )}
+        {realtimeError && <p className="gallery-notice" role="status">{realtimeError}</p>}
+
+        <div className={`gallery-album-panel gallery-album-panel--${activeSpace}`}>
+          <header className="gallery-album-panel__heading">
+            <div>
+              <h3>{activeImages.length ? 'Ảnh trong album' : 'Album đang trống'}</h3>
+              <p>{loading ? 'Đang mở album…' : `${activeImages.length} bức ảnh`}</p>
+            </div>
+            <Sparkles size={19} aria-hidden />
+          </header>
           {activeImages.length > 0 ? (
-            <div className="space-masonry">
+            <div className={`gallery-masonry gallery-masonry--${album.style}`}>
               {activeImages.map((image, index) => (
-                <PhotoTile
-                  key={image.id}
-                  image={image}
-                  index={index}
-                  spaceTitle={active.title}
-                  onOpen={() => setLightbox({ scope: 'space', index })}
-                />
+                <AlbumPhoto key={image.id} image={image} index={index} onOpen={() => setLightbox({ scope: 'album', index })} />
               ))}
             </div>
-          ) : (
-            <div className="space-empty">
+          ) : !loading && (
+            <div className={`gallery-empty gallery-empty--${album.style}`}>
               <SpaceGlyph id={activeSpace} />
-              <p>Chưa có ảnh trong {active.title} nè.</p>
-              <span>Ảnh sẽ hiện ở đây khi được thêm vào kho.</span>
+              <h4>Chưa có ảnh nào ở đây.</h4>
+              <p>Thêm ảnh để bắt đầu lưu những khoảnh khắc trong album này.</p>
+              <button type="button" className="photo-button photo-button--quiet" onClick={() => setShowUploader(true)}>
+                <Plus size={16} aria-hidden /> Chọn ảnh
+              </button>
             </div>
           )}
         </div>
-        <Lightbox
-          items={activeLightbox}
-          index={lightbox?.scope === 'space' ? lightbox.index : null}
-          onClose={() => setLightbox(null)}
-          onNavigate={(index) => setLightbox({ scope: 'space', index })}
-        />
 
-        {grouped.unclassified.length > 0 && (
-          <div className="unclassified-shelf">
-            <div className="unclassified-shelf__heading">
-              <h3>Ảnh chưa gắn không gian</h3>
-              <span>{grouped.unclassified.length} ảnh</span>
+        {groupedUnclassified.length > 0 && (
+          <section className="gallery-unclassified" aria-labelledby="unclassified-title">
+            <div className="gallery-unclassified__heading">
+              <div>
+                <h3 id="unclassified-title">Ảnh chưa xếp album</h3>
+                <p>Ảnh hiện có chưa gắn với một trong ba không gian.</p>
+              </div>
+              <span>{groupedUnclassified.length}</span>
             </div>
-            <p>Mấy tấm này chưa có góc riêng, nên mình để ở đây nha.</p>
-            <div className="space-masonry space-masonry--unclassified">
-              {grouped.unclassified.map((image, index) => (
-                <PhotoTile
-                  key={image.id}
-                  image={image}
-                  index={index}
-                  spaceTitle="kho ảnh"
-                  onOpen={() => setLightbox({ scope: 'unclassified', index })}
-                />
+            <div className="gallery-masonry gallery-masonry--unclassified">
+              {groupedUnclassified.map((image, index) => (
+                <AlbumPhoto key={image.id} image={image} index={index} onOpen={() => setLightbox({ scope: 'unclassified', index })} />
               ))}
             </div>
-          </div>
+          </section>
         )}
-        <Lightbox
-          items={unclassifiedLightbox}
-          index={lightbox?.scope === 'unclassified' ? lightbox.index : null}
-          onClose={() => setLightbox(null)}
-          onNavigate={(index) => setLightbox({ scope: 'unclassified', index })}
-        />
 
-        <div className="diary-spread">
-          <div className="diary-spread__head">
+        <section className="gallery-diary" aria-labelledby="gallery-diary-title">
+          <div className="gallery-diary__heading">
             <div>
               <span className="section-kicker">Nhật ký ảnh</span>
-              <h3>Mấy trang đã cất</h3>
+              <h3 id="gallery-diary-title">Những ngày đã lưu</h3>
             </div>
             {diary.length > 0 && <span>{diary.length} trang</span>}
           </div>
-          {diary.length > 0 ? (
-            <div className="diary-grid">
-              {diary.map((entry, index) => (
-                <article className="diary-entry" key={entry.id}>
-                  <div className="diary-entry__text">
-                    {entry.date && <time>{entry.date}</time>}
-                    {entry.caption && <p>{entry.caption}</p>}
-                  </div>
-                  <PhotoTile image={entry} index={index} spaceTitle="nhật ký ảnh" onOpen={() => setLightbox({ scope: 'diary', index })} />
-                </article>
+          {diaryImages.length > 0 ? (
+            <div className="gallery-diary__grid">
+              {diaryImages.map((image, index) => (
+                <AlbumPhoto key={image.id} image={image} index={index} onOpen={() => setLightbox({ scope: 'diary', index })} />
               ))}
             </div>
           ) : (
-            <div className="diary-empty">
-              <span className="diary-empty__line" aria-hidden />
-              <p>Chưa có trang ảnh nào nè.</p>
-            </div>
+            <p className="gallery-diary__empty">Chưa có trang nhật ký ảnh.</p>
           )}
-          <Lightbox
-            items={diaryLightbox}
-            index={lightbox?.scope === 'diary' ? lightbox.index : null}
-            onClose={() => setLightbox(null)}
-            onNavigate={(index) => setLightbox({ scope: 'diary', index })}
-          />
-        </div>
-
-        {highlight && (
-          <div className="memory-highlight">
-            <div className="memory-highlight__text">
-              <span className="section-kicker">Một khung hình</span>
-              <h3>Ảnh đầu tiên trong kho</h3>
-              {highlight.caption && <p>{highlight.caption}</p>}
-            </div>
-            <figure>
-              <img src={highlight.public_url} alt={highlight.caption || 'Ảnh trong kho My Love'} loading="lazy" decoding="async" width="1200" height="900" />
-            </figure>
-          </div>
-        )}
+        </section>
 
         {statistics.length > 0 && (
           <dl className="real-statistics" aria-label="Số liệu trong kho My Love">
             {statistics.map((stat) => (
-              <div key={stat.label}>
-                <dt>{stat.label}</dt>
-                <dd>{stat.value}</dd>
-              </div>
+              <div key={stat.label}><dt>{stat.label}</dt><dd>{stat.value}</dd></div>
             ))}
           </dl>
+        )}
+
+        <Lightbox
+          items={albumItems}
+          index={lightbox?.scope === 'album' ? lightbox.index : null}
+          onClose={() => setLightbox(null)}
+          onNavigate={(index) => setLightbox({ scope: 'album', index })}
+        />
+        <Lightbox
+          items={unclassifiedItems}
+          index={lightbox?.scope === 'unclassified' ? lightbox.index : null}
+          onClose={() => setLightbox(null)}
+          onNavigate={(index) => setLightbox({ scope: 'unclassified', index })}
+        />
+        <Lightbox
+          items={diaryItems}
+          index={lightbox?.scope === 'diary' ? lightbox.index : null}
+          onClose={() => setLightbox(null)}
+          onNavigate={(index) => setLightbox({ scope: 'diary', index })}
+        />
+
+        {showUploader && (
+          <PhotoUploadDialog
+            initialAlbum={activeSpace}
+            uploader={identity.name}
+            onClose={() => setShowUploader(false)}
+            onUpload={handleUpload}
+            onUploaded={handleUploaded}
+          />
+        )}
+        {editingPhoto && (editingPhoto.signedUrl || photoUrls.get(editingPhoto.id)) && (
+          <PhotoDetailDialog
+            key={editingPhoto.id}
+            image={editingPhoto}
+            src={editingPhoto.signedUrl ?? photoUrls.get(editingPhoto.id) ?? ''}
+            canEdit={!editingPhoto.storagePath || editingPhoto.ownerId === identity.userId}
+            onClose={() => setEditingPhoto(null)}
+            onSave={updatePhoto}
+            onDelete={deletePhoto}
+            onShare={editingPhoto.storagePath ? undefined : shareLocalPhoto}
+          />
         )}
       </div>
     </section>

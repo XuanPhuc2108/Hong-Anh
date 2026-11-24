@@ -48,10 +48,10 @@ export function OpeningExperience({ phase, progress, status, error, onOpen, onRe
           </p>
           <h1 id="opening-title" className="opening-title">Nhật ký của<br />Phúc <span>&amp;</span> Ánh</h1>
           <button type="button" className="glass-action" onClick={onOpen}>
-            <span>Mở cuốn sổ nè</span>
+            <span>Mở cuốn sổ</span>
             <span aria-hidden className="glass-action__arrow">↗</span>
           </button>
-          <p className="opening-hint">Chạm nhẹ một cái là mở nha</p>
+          <p className="opening-hint">Chạm để mở nhật ký</p>
         </div>
       </div>
     );
@@ -63,7 +63,7 @@ export function OpeningExperience({ phase, progress, status, error, onOpen, onRe
       <div className="loading-content">
         <BrandMark className="h-10 w-10" />
         <h1 id="loading-title" className="loading-title">
-          {phase === 'error' ? 'Chưa mở được cuốn sổ nè' : 'Đang xếp từng trang'}
+          {phase === 'error' ? 'Không thể mở nhật ký' : 'Đang tải nhật ký'}
         </h1>
         <div className="journey-loader" role="img" aria-label={`Đã tải ${progress}%`}>
           <svg viewBox="0 0 100 110" aria-hidden>

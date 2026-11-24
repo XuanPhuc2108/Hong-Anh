@@ -83,17 +83,17 @@ function MomentCard({
     try {
       if (navigator.share) {
         await navigator.share({ title: moment.title, text: moment.description, url });
-        setShareStatus('Mở bảng chia sẻ rồi nè.');
+        setShareStatus('Đã mở bảng chia sẻ.');
       } else if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
-        setShareStatus('Đã chép liên kết nè.');
+        setShareStatus('Đã sao chép liên kết.');
       } else {
-        window.prompt('Chép liên kết của kỷ niệm này nè:', url);
+        window.prompt('Sao chép liên kết kỷ niệm:', url);
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
       console.error('Không thể chia sẻ ghi chép.', error);
-      setShareStatus('Chưa chia sẻ được lúc này nè.');
+      setShareStatus('Không thể chia sẻ lúc này. Hãy thử lại.');
     }
   };
 

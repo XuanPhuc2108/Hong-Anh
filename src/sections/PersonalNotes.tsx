@@ -10,8 +10,8 @@ function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function PersonalNotes({ notes, stories }: { notes: NoteRecord[]; stories: StoryRecord[] }) {
-  const [localNotes, setLocalNotes, storageError] = useDeviceValue<LocalNote[]>(STORAGE_KEY, []);
+export function PersonalNotes({ notes, stories, userId }: { notes: NoteRecord[]; stories: StoryRecord[]; userId: string }) {
+  const [localNotes, setLocalNotes, storageError] = useDeviceValue<LocalNote[]>(`${STORAGE_KEY}:${userId}`, []);
   const [draft, setDraft] = useState({ title: '', body: '' });
   const [editing, setEditing] = useState<LocalNote | null>(null);
 
@@ -80,7 +80,7 @@ export function PersonalNotes({ notes, stories }: { notes: NoteRecord[]; stories
       ) : (
         <div className="notes-empty">
           <span aria-hidden>✿</span>
-          <p>Góc này đang chờ vài dòng đầu tiên nè.</p>
+          <p>Chưa có ghi chú. Viết ghi chú đầu tiên bên dưới.</p>
         </div>
       )}
       <form className="note-create" onSubmit={addNote}>
@@ -91,7 +91,7 @@ export function PersonalNotes({ notes, stories }: { notes: NoteRecord[]; stories
         <button type="submit" className="note-create__button"><Plus size={16} aria-hidden /> Cất ghi chú</button>
       </form>
       {storageError && <p className="storage-message" role="status">{storageError}</p>}
-      <p className="local-only-note">Ghi chú mới chỉ lưu trên thiết bị này nha.</p>
+      <p className="local-only-note">Ghi chú chỉ lưu trên thiết bị này.</p>
     </section>
   );
 }

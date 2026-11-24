@@ -9,8 +9,8 @@ function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function Wishlist() {
-  const [items, setItems, storageError] = useDeviceValue<WishItem[]>(STORAGE_KEY, []);
+export function Wishlist({ userId }: { userId: string }) {
+  const [items, setItems, storageError] = useDeviceValue<WishItem[]>(`${STORAGE_KEY}:${userId}`, []);
   const [title, setTitle] = useState('');
   const [editing, setEditing] = useState<{ id: string; title: string } | null>(null);
 
@@ -35,8 +35,8 @@ export function Wishlist() {
     <section className="wishlist" aria-labelledby="wishlist-title">
       <div className="corner-section-head">
         <span className="section-kicker">Danh sách muốn làm</span>
-        <h3 id="wishlist-title">Mấy điều muốn thử cùng nhau</h3>
-        <p>Thêm điều tụi mình muốn làm nha. Danh sách chỉ lưu trên thiết bị này.</p>
+        <h3 id="wishlist-title">Những điều muốn làm cùng nhau</h3>
+        <p>Danh sách chỉ lưu trên thiết bị này.</p>
       </div>
       {items.length > 0 && (
         <div className="wishlist-progress" aria-label={`${completed} trên ${items.length} điều đã hoàn thành`}>
@@ -93,8 +93,8 @@ export function Wishlist() {
       ) : (
         <div className="wishlist-empty">
           <span className="wishlist-empty__flower" aria-hidden>✿</span>
-          <p>Danh sách còn trống nè.</p>
-          <span>Thêm điều đầu tiên tụi mình muốn thử nha.</span>
+          <p>Danh sách chưa có mục nào.</p>
+          <span>Thêm điều đầu tiên hai bạn muốn thử.</span>
         </div>
       )}
     </section>

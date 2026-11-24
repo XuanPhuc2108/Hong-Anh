@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+
 export type MemoryRecord = {
   id: string;
   date: string | null;
@@ -12,7 +14,7 @@ export type MemoryRecord = {
 export type GalleryRecord = {
   id: string;
   storage_path: string;
-  public_url: string;
+  signed_url: string;
   caption: string | null;
   span: 'tall' | 'wide' | 'square' | 'big';
   ordering: number;
@@ -21,7 +23,7 @@ export type GalleryRecord = {
 export type DiaryRecord = {
   id: string;
   storage_path: string;
-  public_url: string;
+  signed_url: string;
   caption: string | null;
   date: string | null;
   ordering: number;
@@ -70,8 +72,8 @@ export async function loadJournalData(): Promise<JournalData> {
   try {
     const [memories, gallery, diary, notes, stories, settings] = await Promise.all([
       supabase.from('memories').select('id,date,title,description,photo_url,ordering').order('ordering').limit(100).abortSignal(controller.signal),
-      supabase.from('gallery_images').select('id,storage_path,public_url,caption,span,ordering').order('ordering').limit(200).abortSignal(controller.signal),
-      supabase.from('diary_entries').select('id,storage_path,public_url,caption,date,ordering').order('ordering').limit(100).abortSignal(controller.signal),
+      supabase.from('gallery_images').select('id,storage_path,caption,span,ordering').order('ordering').limit(200).abortSignal(controller.signal),
+      supabase.from('diary_entries').select('id,storage_path,caption,date,ordering').order('ordering').limit(100).abortSignal(controller.signal),
       supabase.from('notes').select('id,title,body,ordering').order('ordering').limit(100).abortSignal(controller.signal),
       supabase.from('stories').select('id,title,body,photo_url,ordering').order('ordering').limit(100).abortSignal(controller.signal),
       supabase.from('site_settings').select('key,value').abortSignal(controller.signal),
@@ -88,13 +90,44 @@ export async function loadJournalData(): Promise<JournalData> {
 
     if (failed?.error) throw new Error(`Chưa tải được ${failed.table}: ${failed.error.message}`);
 
+    const memoryRows = (memories.data ?? []) as MemoryRecord[];
+    const galleryRows = (gallery.data ?? []) as Omit<GalleryRecord, 'signed_url'>[];
+    const diaryRows = (diary.data ?? []) as Omit<DiaryRecord, 'signed_url'>[];
+    const storyRows = (stories.data ?? []) as StoryRecord[];
+    const storagePaths = [...new Set([
+      ...galleryRows.map((row) => row.storage_path),
+      ...diaryRows.map((row) => row.storage_path),
+      ...memoryRows.map((row) => storagePathFromUrl(row.photo_url)).filter((path): path is string => Boolean(path)),
+      ...storyRows.map((row) => storagePathFromUrl(row.photo_url)).filter((path): path is string => Boolean(path)),
+    ].filter(Boolean))];
+    const signedUrls = new Map<string, string>();
+    if (storagePaths.length > 0) {
+      const { data: signedEntries, error: signedError } = await supabase.storage
+        .from('gallery')
+        .createSignedUrls(storagePaths, 24 * 60 * 60);
+      if (signedError) throw new Error(`Chưa tạo được liên kết riêng tư cho ảnh cũ: ${signedError.message}`);
+      if (!signedEntries) throw new Error('Không nhận được liên kết riêng tư cho ảnh cũ.');
+      for (const entry of signedEntries) {
+        if (entry.error || !entry.path || !entry.signedUrl) {
+          throw new Error(`Không mở được ảnh riêng tư "${entry.path ?? 'không rõ'}".`);
+        }
+        signedUrls.set(entry.path, entry.signedUrl);
+      }
+    }
+
     return {
       connected: true,
-      memories: (memories.data ?? []) as MemoryRecord[],
-      gallery: (gallery.data ?? []) as GalleryRecord[],
-      diary: (diary.data ?? []) as DiaryRecord[],
+      memories: memoryRows.map((row) => {
+        const path = storagePathFromUrl(row.photo_url);
+        return path ? { ...row, photo_url: signedUrls.get(path) ?? null } : row;
+      }),
+      gallery: galleryRows.map((row) => ({ ...row, signed_url: signedUrls.get(row.storage_path) ?? '' })),
+      diary: diaryRows.map((row) => ({ ...row, signed_url: signedUrls.get(row.storage_path) ?? '' })),
       notes: (notes.data ?? []) as NoteRecord[],
-      stories: (stories.data ?? []) as StoryRecord[],
+      stories: storyRows.map((row) => {
+        const path = storagePathFromUrl(row.photo_url);
+        return path ? { ...row, photo_url: signedUrls.get(path) ?? null } : row;
+      }),
       settings: Object.fromEntries((settings.data ?? []).map(({ key, value }) => [key, value ?? ''])),
     };
   } catch (error) {
@@ -102,6 +135,23 @@ export async function loadJournalData(): Promise<JournalData> {
     throw error;
   } finally {
     window.clearTimeout(timeout);
+  }
+}
+
+function storagePathFromUrl(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const projectUrl = new URL(SUPABASE_URL);
+    const url = new URL(value, projectUrl);
+    if (url.origin !== projectUrl.origin) return null;
+    const marker = '/storage/v1/object/';
+    const objectIndex = url.pathname.indexOf(marker);
+    if (objectIndex < 0) return value.startsWith('/') ? null : value;
+    const [visibility, bucket, ...segments] = url.pathname.slice(objectIndex + marker.length).split('/');
+    if (!['public', 'sign', 'authenticated'].includes(visibility) || bucket !== 'gallery' || segments.length === 0) return null;
+    return segments.map((segment) => decodeURIComponent(segment)).join('/');
+  } catch {
+    return null;
   }
 }
 

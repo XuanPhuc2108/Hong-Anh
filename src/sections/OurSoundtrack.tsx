@@ -85,7 +85,7 @@ function PlaylistCard({ playlist }: { playlist: (typeof playlists)[number] }) {
           </>
         ) : (
           <div className="playlist__empty">
-            <span>Playlist chưa có bài nào nè.</span>
+            <span>Playlist chưa có bài hát nào.</span>
           </div>
         )}
       </div>
@@ -100,7 +100,7 @@ export function OurSoundtrack() {
         <div className="section-lead">
           <span className="section-kicker">Nhạc của tụi mình</span>
           <h2 id="soundtrack-title">Playlist nghe cùng nhau</h2>
-          <p>Bấm vào ảnh bìa để mở playlist của Ánh hoặc Phúc nè.</p>
+          <p>Chọn ảnh bìa để mở playlist của Ánh hoặc Phúc.</p>
         </div>
         <div className="playlist-pair">
           {playlists.map((playlist) => <PlaylistCard key={playlist.id} playlist={playlist} />)}
