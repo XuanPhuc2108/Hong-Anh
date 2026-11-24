@@ -8,6 +8,9 @@
 
 ## Trang thai
 
+- Pull Request: https://github.com/XuanPhuc2108/Hong-Anh/pull/6
+- Commit cuoi: `08f0b8d Add guest mode and private access controls`
+- Check GitHub: Vercel SUCCESS
 - Da co Guest mode voi ba lua chon truy cap: Phuc, Anh va tham quan.
 - Guest chi thay Hero, ba album khoa va phong bi minh hoa.
 - Guest khong mount gallery, thu, journal data, Realtime hoac Storage rieng tu.
