@@ -163,10 +163,30 @@ export function CoupleAuthGate({ children }: CoupleAuthGateProps) {
     setError('');
     setNotice('');
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+      const identifier = email.trim();
+      let signInError: { message: string } | null = null;
+      if (identifier.toLocaleLowerCase('en') === 'honganh') {
+        const { data, error: functionError } = await supabase.functions.invoke('couple-login', {
+          body: { username: 'honganh', password },
+        });
+        if (functionError) {
+          signInError = functionError;
+        } else if (!data?.access_token || !data?.refresh_token) {
+          signInError = { message: 'Username login did not return a valid session.' };
+        } else {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: data.access_token,
+            refresh_token: data.refresh_token,
+          });
+          if (sessionError) signInError = sessionError;
+        }
+      } else {
+        const result = await supabase.auth.signInWithPassword({
+          email: identifier,
+          password,
+        });
+        signInError = result.error;
+      }
       if (signInError) {
         console.error('Đăng nhập My Love thất bại.', signInError);
         setError('Email hoặc mật khẩu không đúng, hoặc tài khoản chưa được kích hoạt.');
@@ -350,9 +370,9 @@ export function CoupleAuthGate({ children }: CoupleAuthGateProps) {
               ) : (
                 <>
               <label>
-                <span><Mail size={15} aria-hidden /> Email</span>
+                <span><Mail size={15} aria-hidden /> {loginFor === 'Ánh' ? 'Email hoặc username' : 'Email'}</span>
                 <input
-                  type="email"
+                  type={loginFor === 'Ánh' ? 'text' : 'email'}
                   autoComplete="username"
                   inputMode="email"
                   value={email}

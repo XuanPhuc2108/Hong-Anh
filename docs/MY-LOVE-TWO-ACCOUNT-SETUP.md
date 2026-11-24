@@ -25,6 +25,8 @@ Không đưa mật khẩu, `service_role` key hoặc nội dung `.env.local` và
    Bảng chỉ chấp nhận hai tên định danh `Phúc` và `Ánh`; quyền được xác định bằng UUID, không dựa vào email hay dữ liệu do frontend gửi.
 5. Trong Auth URL Configuration, thêm origin của production, preview và localhost vào Redirect URLs để email khôi phục mật khẩu quay lại đúng website.
 6. Giữ các biến frontend hiện có: `VITE_SUPABASE_URL` và một trong `VITE_SUPABASE_ANON_KEY` hoặc `VITE_SUPABASE_PUBLISHABLE_KEY`. Chỉ dùng public client key; không đặt service-role key trong Vercel frontend.
+7. Triển khai Edge Function `couple-login` và đặt `SUPABASE_SERVICE_ROLE_KEY` trong Supabase Function secrets. Đây là secret server-side, không đưa vào frontend hay Vercel.
+8. Gán username `honganh` cho đúng UUID Ánh bằng server-side app_metadata. Chỉ thực hiện bằng Supabase admin API hoặc Edge Function admin đã xác thực; không thêm trường username do frontend/user metadata tự quản.
 
 Migration tạo bucket private `couple-private` (tệp tối đa 50 MB), RLS cho ảnh/thư, hàm kiểm tra thành viên và thêm bảng ảnh/thư vào publication `supabase_realtime`. Migration guest cũng siết các bảng nhật ký cũ, bao gồm `admin_profiles`, và bucket `gallery`. Không chỉnh CORS.
 
