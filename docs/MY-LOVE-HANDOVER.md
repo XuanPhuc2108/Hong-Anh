@@ -53,5 +53,5 @@ Kiem tra direct REST va Storage khi migration da ap dung tren staging. Guest pha
 - Chua ap dung migration production/staging.
 - Chua xac minh API anon truc tiep voi du lieu that.
 - Chua kiem tra hai tai khoan that vi khong co thong tin session staging duoc cung cap trong repo.
-- Chua cau hinh username login cho Anh tren server; khong hardcode email/password.
+- Phai deploy Edge Function `couple-login` va gan app_metadata `username: honganh` cho dung UUID Anh. Phuc van dang nhap bang email.
 - Kiem tra deploy va PR se duoc ghi vao phan sau khi push va tao PR.
