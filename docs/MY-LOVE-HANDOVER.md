@@ -8,7 +8,11 @@
 
 ## Trang thai
 
-- Pull Request: https://github.com/XuanPhuc2108/Hong-Anh/pull/6
+- Pull Request login: https://github.com/XuanPhuc2108/Hong-Anh/pull/7
+- Dang nhap production da duoc kich hoat voi hai tai khoan thanh vien.
+- Migrations 20261124154500 va 20261125120000 da ap dung production.
+- Bucket gallery va couple-private hien la private.
+- Edge Functions couple-login va couple-bootstrap da deploy production.
 - Commit cuoi: `08f0b8d Add guest mode and private access controls`
 - Check GitHub: Vercel SUCCESS
 - Da co Guest mode voi ba lua chon truy cap: Phuc, Anh va tham quan.
